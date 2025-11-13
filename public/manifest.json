@@ -1,0 +1,33 @@
+{
+  "name": "Sonarchy - Playlist Clash Party Bash",
+  "short_name": "Sonarchy",
+  "description": "Play music playlist battles with friends and party online",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000022",
+  "theme_color": "#00F2FF",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/icon-192.jpg",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.jpg",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["games", "music", "entertainment"],
+  "screenshots": [
+    {
+      "src": "/screenshot-mobile.png",
+      "sizes": "393x852",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ]
+}
