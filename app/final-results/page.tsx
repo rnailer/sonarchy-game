@@ -1,9 +1,9 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useRouter, useSearchParams } from 'next/navigation'
 import Image from "next/image"
-import { Play, Share2, Home } from "lucide-react"
+import { Play, Share2, Home } from 'lucide-react'
 import { createClient } from "@/lib/supabase/client"
 
 const PLAYER_COLOR_SETS = [
@@ -65,7 +65,6 @@ export default function FinalResults() {
 
       console.log("[v0] 📊 Total placements:", placements?.length || 0)
 
-      // Calculate scores for each player
       const playerScores = players.map((player, index) => {
         // Get all votes for this player's song
         const votesForPlayer = placements?.filter((p) => p.song_player_id === player.id) || []
@@ -81,12 +80,13 @@ export default function FinalResults() {
 
         console.log("[v0] 🎯", player.player_name, "- Total votes:", votesForPlayer.length, "Score:", avgScore)
 
+        // Ensure we always have song data, even if missing
         return {
           playerId: player.id,
-          playerName: player.player_name,
-          songTitle: player.song_title || "No Song",
+          playerName: player.player_name || "Unknown Player",
+          songTitle: player.song_title || "No Song Selected",
           songArtist: player.song_artist || "",
-          albumCover: player.album_cover_url,
+          albumCover: player.album_cover_url || "/placeholder.svg",
           score: avgScore,
           color: PLAYER_COLOR_SETS[index % PLAYER_COLOR_SETS.length].bg,
         }
@@ -108,12 +108,26 @@ export default function FinalResults() {
   }, [gameCode])
 
   const handlePlayAgain = () => {
-    router.push(`/category-selection?code=${gameCode}`)
+    router.push(`/game-lounge?code=${gameCode}`)
   }
 
   const handleShare = () => {
-    console.log("[v0] Share results")
-    // TODO: Implement share functionality
+    const winner = leaderboard[0]
+    const shareText = `🎵 I just played Sonarchy! ${winner?.playerName} won with ${winner?.score.toFixed(1)} points! 🏆`
+
+    if (navigator.share) {
+      navigator
+        .share({
+          title: "Sonarchy Game Results",
+          text: shareText,
+          url: window.location.origin,
+        })
+        .catch((err) => console.log("[v0] Share failed:", err))
+    } else {
+      // Fallback: copy to clipboard
+      navigator.clipboard.writeText(shareText)
+      alert("Results copied to clipboard!")
+    }
   }
 
   const handlePickGame = () => {
@@ -144,7 +158,6 @@ export default function FinalResults() {
       >
         GAME COMPLETE!
       </h1>
-      {/* </CHANGE> */}
 
       <div className="absolute top-20 left-10 text-4xl animate-bounce" style={{ animationDelay: "0s" }}>
         🎵
@@ -276,7 +289,6 @@ export default function FinalResults() {
                 <p className="text-[0.75rem] text-white/70 leading-tight mt-1">
                   Score: {entry.score.toFixed(1)} points
                 </p>
-                {/* </CHANGE> */}
               </div>
 
               {entry.albumCover && (

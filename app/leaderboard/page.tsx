@@ -1,23 +1,23 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from "next/link"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
 const PLAYER_COLOR_SETS = [
-  { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" }, // Neon Violet
-  { border: "#B9F3FF", bg: "#0891B2", shadow: "#0E7490" }, // Electric Blue
-  { border: "#D2FFFF", bg: "#06B6D4", shadow: "#0891B2" }, // Aqua Cyan
-  { border: "#FFE5B4", bg: "#FB923C", shadow: "#EA580C" }, // Sunset Orange
-  { border: "#FFD0F5", bg: "#EC4899", shadow: "#DB2777" }, // Hot Pink
-  { border: "#C7D2FF", bg: "#4338CA", shadow: "#3730A3" }, // Deep Indigo
-  { border: "#FFF8C4", bg: "#FBBF24", shadow: "#F59E0B" }, // Amber Yellow
-  { border: "#F5D8FF", bg: "#D946EF", shadow: "#C026D3" }, // Magenta Purple
-  { border: "#D0F5E5", bg: "#14B8A6", shadow: "#0D9488" }, // Teal Green
-  { border: "#E5E7EB", bg: "#6B7280", shadow: "#4B5563" }, // Charcoal Grey
+  { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
+  { border: "#B9F3FF", bg: "#0891B2", shadow: "#0E7490" },
+  { border: "#D2FFFF", bg: "#06B6D4", shadow: "#0891B2" },
+  { border: "#FFE5B4", bg: "#FB923C", shadow: "#EA580C" },
+  { border: "#FFD0F5", bg: "#EC4899", shadow: "#DB2777" },
+  { border: "#C7D2FF", bg: "#4338CA", shadow: "#3730A3" },
+  { border: "#FFF8C4", bg: "#FBBF24", shadow: "#F59E0B" },
+  { border: "#F5D8FF", bg: "#D946EF", shadow: "#C026D3" },
+  { border: "#D0F5E5", bg: "#14B8A6", shadow: "#0D9488" },
+  { border: "#E5E7EB", bg: "#6B7280", shadow: "#4B5563" },
 ]
 
 export default function Leaderboard() {
@@ -41,6 +41,9 @@ export default function Leaderboard() {
 
   const [isSaving, setIsSaving] = useState(false)
   const [hasPlacedAllSongs, setHasPlacedAllSongs] = useState(false)
+
+  const hasNavigated = useRef(false)
+  const isProcessingNavigation = useRef(false)
 
   useEffect(() => {
     const fetchGameInfo = async () => {
@@ -134,153 +137,185 @@ export default function Leaderboard() {
   }, [timeRemaining, showTimeUp])
 
   useEffect(() => {
-    if (!showTimeUp || !gameCode || !gameId || !currentSongPlayerId) return
+    if (
+      !showTimeUp ||
+      !gameCode ||
+      !gameId ||
+      !currentSongPlayerId ||
+      isProcessingNavigation.current ||
+      hasNavigated.current
+    )
+      return
 
-    const checkIfAllPlayersPlaced = async () => {
+    const determineNextStep = async () => {
+      isProcessingNavigation.current = true
       const supabase = createClient()
 
-      const { data: allPlayers } = await supabase.from("game_players").select("id").eq("game_id", gameId)
+      console.log("[v0] 🎯 === LEADERBOARD NAVIGATION LOGIC ===")
 
-      const totalPlayers = allPlayers?.length || 0
+      // Step 1: Get current game state
+      const { data: game } = await supabase
+        .from("games")
+        .select("id, current_round, current_song_player_id, starting_player_index")
+        .eq("game_code", gameCode)
+        .single()
 
-      const { data: placements } = await supabase
+      if (!game) {
+        console.log("[v0] ❌ No game found")
+        isProcessingNavigation.current = false
+        return
+      }
+
+      console.log("[v0] 📊 Current round:", game.current_round)
+      console.log("[v0] 📊 Current song player ID from DB:", game.current_song_player_id)
+
+      // Step 2: Get all players
+      const { data: allPlayers } = await supabase
+        .from("game_players")
+        .select("*")
+        .eq("game_id", gameId)
+        .order("joined_at", { ascending: true })
+
+      const totalPlayerCount = allPlayers?.length || 0
+      console.log("[v0] 👥 Total players:", totalPlayerCount)
+
+      // Step 3: Check if all players have ranked current song
+      const { data: currentSongPlacements } = await supabase
         .from("leaderboard_placements")
         .select("player_id")
         .eq("game_id", gameId)
-        .eq("round_number", currentRound)
+        .eq("round_number", game.current_round)
         .eq("song_player_id", currentSongPlayerId)
 
-      const placedCount = placements?.length || 0
+      const playersWhoRanked = new Set(currentSongPlacements?.map((p) => p.player_id) || [])
+      console.log("[v0] 📊 Players who ranked current song:", playersWhoRanked.size, "/", totalPlayerCount)
 
-      console.log("[v0] 🎯 Placement progress:", { placedCount, totalPlayers })
+      // Don't wait for the song owner to rank their own song
+      const allPlayersReady = playersWhoRanked.size >= totalPlayerCount - 1
 
-      if (placedCount >= totalPlayers - 1 && totalPlayers > 1) {
-        console.log("[v0] ✅ All players have placed current song!")
+      if (!allPlayersReady) {
+        console.log("[v0] ⏳ Waiting for more players to rank...")
+        isProcessingNavigation.current = false
+        return
+      }
 
-        await supabase.from("game_players").update({ song_played: true }).eq("id", currentSongPlayerId)
+      console.log("[v0] ✅ All players have ranked! Proceeding...")
 
-        await supabase.from("games").update({ current_song_player_id: null }).eq("id", gameId)
+      // Step 4: Mark current song as played (single source of truth)
+      await supabase.from("game_players").update({ song_played: true }).eq("id", currentSongPlayerId)
+      console.log("[v0] ✅ Marked song as played")
 
-        const { data: unplayedPlayers } = await supabase
-          .from("game_players")
-          .select("*")
-          .eq("game_id", gameId)
-          .not("song_uri", "is", null)
-          .eq("song_played", false)
+      // Step 5: Check for next unplayed song in current round
+      const { data: unplayedSongs } = await supabase
+        .from("game_players")
+        .select("id, player_name, song_title")
+        .eq("game_id", gameId)
+        .not("song_uri", "is", null)
+        .eq("song_played", false)
+        .order("joined_at", { ascending: true })
 
-        console.log("[v0] 🔍 Unplayed songs remaining:", unplayedPlayers?.length || 0)
+      console.log("[v0] 🔍 Unplayed songs remaining:", unplayedSongs?.length || 0)
 
-        if (unplayedPlayers && unplayedPlayers.length > 0) {
-          console.log("[v0] ➡️ Going to next song playback")
-          const timestamp = Date.now()
-          router.push(
-            `/playtime-playback?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&t=${timestamp}`,
-          )
-        } else {
-          console.log("[v0] 🎯 Round complete! Checking if game should end...")
+      if (unplayedSongs && unplayedSongs.length > 0) {
+        // More songs to play in this round
+        console.log("[v0] ➡️ Moving to next song:", unplayedSongs[0].song_title)
 
-          const { data: players } = await supabase
-            .from("game_players")
-            .select("id, player_name")
-            .eq("game_id", gameId)
-            .order("joined_at", { ascending: true })
+        // Set next song as current (synchronized for all clients)
+        await supabase.from("games").update({ current_song_player_id: unplayedSongs[0].id }).eq("id", gameId)
 
-          const playerCount = players?.length || 0
-          console.log("[v0] 📊 Total players:", playerCount)
-          console.log("[v0] 📊 Current round:", currentRound)
+        hasNavigated.current = true
+        await new Promise((resolve) => setTimeout(resolve, 500))
 
-          if (currentRound >= playerCount) {
-            console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All players have selected categories!")
-            console.log("[v0] 🏆 Navigating to final results/podium...")
+        const timestamp = Date.now()
+        router.push(
+          `/playtime-playback?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&t=${timestamp}`,
+        )
+        return
+      }
 
-            await supabase.from("games").update({ current_category: null }).eq("id", gameId)
-            await supabase
-              .from("game_players")
-              .update({
-                has_selected_category: false,
-                song_played: false,
-                song_uri: null,
-                song_title: null,
-                song_artist: null,
-                song_preview_url: null,
-                album_cover_url: null,
-              })
-              .eq("game_id", gameId)
+      // Step 6: All songs in round complete - check if game should end
+      console.log("[v0] 🎯 Round complete! Checking if game should end...")
+      console.log("[v0] 📊 Current round:", game.current_round)
+      console.log("[v0] 📊 Total players:", totalPlayerCount)
 
-            const timestamp = Date.now()
-            router.push(`/final-results?code=${gameCode}&t=${timestamp}`)
-            return
-          }
+      if (game.current_round >= totalPlayerCount) {
+        // Game complete!
+        console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All rounds played!")
 
-          await supabase.from("games").update({ current_category: null }).eq("id", gameId)
-          console.log("[v0] 🧹 Cleared current category")
+        hasNavigated.current = true
+        await new Promise((resolve) => setTimeout(resolve, 800))
 
-          await supabase
-            .from("game_players")
-            .update({
-              has_selected_category: false,
-              song_played: false,
-              song_uri: null,
-              song_title: null,
-              song_artist: null,
-              song_preview_url: null,
-              album_cover_url: null,
-            })
-            .eq("game_id", gameId)
-          console.log("[v0] 🧹 Reset all player flags and songs")
+        const timestamp = Date.now()
+        router.push(`/final-results?code=${gameCode}&t=${timestamp}`)
+        return
+      }
 
-          // Increment round BEFORE navigating
-          const nextRound = currentRound + 1
-          await supabase.from("games").update({ current_round: nextRound }).eq("id", gameId)
-          console.log("[v0] ✅ Incremented to round:", nextRound)
+      // Step 7: Start next round
+      console.log("[v0] 🔄 Starting next round...")
 
-          if (players && players.length > 0) {
-            const { data: gameWithStart } = await supabase
-              .from("games")
-              .select("starting_player_index")
-              .eq("id", gameId)
-              .single()
+      const nextRound = game.current_round + 1
+      console.log("[v0] ➡️ Moving to round:", nextRound)
 
-            const startingIndex = gameWithStart?.starting_player_index || 0
-            const turnIndex = (startingIndex + nextRound - 1) % playerCount
-            const nextTurnPlayerId = players[turnIndex].id
-            const nextPlayerName = players[turnIndex].player_name
+      // Reset for next round
+      await supabase
+        .from("games")
+        .update({
+          current_round: nextRound,
+          current_category: null,
+          current_song_player_id: null,
+        })
+        .eq("id", gameId)
 
-            const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+      await supabase
+        .from("game_players")
+        .update({
+          has_selected_category: false,
+          song_played: false,
+          song_uri: null,
+          song_title: null,
+          song_artist: null,
+          song_preview_url: null,
+          album_cover_url: null,
+        })
+        .eq("game_id", gameId)
 
-            console.log("[v0] 🎲 === ROUND NAVIGATION DEBUG ===")
-            console.log("[v0] - Next round:", nextRound)
-            console.log("[v0] - Total players:", playerCount)
-            console.log("[v0] - Starting player index:", startingIndex)
-            console.log("[v0] - Calculation: (", startingIndex, "+", nextRound, "- 1) %", playerCount, "=", turnIndex)
-            console.log("[v0] - Next turn player:", nextPlayerName, "(ID:", nextTurnPlayerId, ")")
-            console.log("[v0] - My player ID:", myPlayerId)
-            console.log("[v0] - Am I the next player?", myPlayerId === nextTurnPlayerId)
+      console.log("[v0] 🧹 Reset all player flags for next round")
 
-            await new Promise((resolve) => setTimeout(resolve, 800))
+      // Determine whose turn it is to select category
+      const startingIndex = game.starting_player_index || 0
+      const turnIndex = (startingIndex + nextRound - 1) % totalPlayerCount
+      const nextTurnPlayer = allPlayers[turnIndex]
+      const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
 
-            const timestamp = Date.now()
-            const cacheParam = Math.random()
+      console.log("[v0] 🎲 Next turn calculation:")
+      console.log("[v0] - Starting index:", startingIndex)
+      console.log("[v0] - Turn index:", turnIndex)
+      console.log("[v0] - Next player:", nextTurnPlayer.player_name)
+      console.log("[v0] - Am I next?", myPlayerId === nextTurnPlayer.id)
 
-            if (myPlayerId === nextTurnPlayerId) {
-              console.log("[v0] ✅✅✅ IT'S MY TURN! Navigating to SELECT-CATEGORY ✅✅✅")
-              router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}&cache=${cacheParam}`)
-            } else {
-              console.log("[v0] ⏳⏳⏳ NOT MY TURN, Navigating to PLAYTIME-WAITING ⏳⏳⏳")
-              console.log("[v0] - Waiting for:", nextPlayerName)
-              router.push(
-                `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextPlayerName)}&t=${timestamp}`,
-              )
-            }
-          }
-        }
+      hasNavigated.current = true
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
+      const timestamp = Date.now()
+
+      if (myPlayerId === nextTurnPlayer.id) {
+        console.log("[v0] ✅ It's my turn to select category!")
+        router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}`)
+      } else {
+        console.log("[v0] ⏳ Waiting for", nextTurnPlayer.player_name, "to select category")
+        router.push(
+          `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextTurnPlayer.player_name)}&t=${timestamp}`,
+        )
       }
     }
 
-    const interval = setInterval(checkIfAllPlayersPlaced, 2000)
-    checkIfAllPlayersPlaced()
+    // Poll every 2 seconds to check if ready to navigate
+    const pollInterval = setInterval(determineNextStep, 2000)
+    determineNextStep() // Initial check
 
-    return () => clearInterval(interval)
+    return () => {
+      clearInterval(pollInterval)
+    }
   }, [showTimeUp, gameCode, gameId, currentSongPlayerId, currentRound, selectedCategory, router])
 
   const handlePlaceSong = async (position: number) => {
@@ -314,7 +349,7 @@ export default function Leaderboard() {
     console.log("[v0] 📊 After placement:", { placedSongs, totalSongs })
 
     if (placedSongs >= totalSongs && totalSongs > 0) {
-      console.log("[v0] ✅ All songs placed! Triggering navigation...")
+      console.log("[v0] ✅ All songs placed!")
       setHasPlacedAllSongs(true)
     }
 
