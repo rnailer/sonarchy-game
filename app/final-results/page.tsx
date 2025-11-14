@@ -1,10 +1,14 @@
+// test deploy
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Button } from "@/components/ui/button";
 import Image from "next/image"
 import { Play, Share2, Home } from 'lucide-react'
 import { createClient } from "@/lib/supabase/client"
+
+
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -18,6 +22,18 @@ const PLAYER_COLOR_SETS = [
   { border: "#D0F5E5", bg: "#14B8A6", shadow: "#0D9488" },
   { border: "#E5E7EB", bg: "#6B7280", shadow: "#4B5563" },
 ]
+
+function formatSongDisplay(entry?: { songTitle?: string | null; songArtist?: string | null }) {
+  if (!entry || !entry.songTitle) {
+    return "No song selected";
+  }
+
+  const title = entry.songTitle.trim();
+  const artist = entry.songArtist?.trim() || "";
+
+  if (!artist) return title;
+  return `${title} – ${artist}`;
+}
 
 export default function FinalResults() {
   const router = useRouter()
@@ -284,7 +300,7 @@ export default function FinalResults() {
               <div className="flex-1">
                 <h3 className="text-[1.25rem] font-bold text-white leading-tight">{entry.playerName}</h3>
                 <p className="text-[0.875rem] text-white/90 leading-tight">
-                  {entry.songTitle} - {entry.songArtist}
+                  {formatSongDisplay(entry)}
                 </p>
                 <p className="text-[0.75rem] text-white/70 leading-tight mt-1">
                   Score: {entry.score.toFixed(1)} points
