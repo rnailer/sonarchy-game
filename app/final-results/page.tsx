@@ -370,7 +370,6 @@ export default function FinalResults() {
           </button>
         </div>
       </div>
-    </div>
 
       <style jsx>{`
         @keyframes confetti-fall {
@@ -387,5 +386,6 @@ export default function FinalResults() {
           }
         }
       `}</style>
+    </div>
   )
 }
