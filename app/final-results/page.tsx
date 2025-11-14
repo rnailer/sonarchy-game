@@ -2,13 +2,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useSearchParams } from 'next/navigation';
-import { Button } from "@/components/ui/button";
+import { useRouter, useSearchParams } from "next/navigation"
 import Image from "next/image"
-import { Play, Share2, Home } from 'lucide-react'
+import { Play, Share2, Home } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-
-
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -25,14 +22,14 @@ const PLAYER_COLOR_SETS = [
 
 function formatSongDisplay(entry?: { songTitle?: string | null; songArtist?: string | null }) {
   if (!entry || !entry.songTitle) {
-    return "No song selected";
+    return "No song selected"
   }
 
-  const title = entry.songTitle.trim();
-  const artist = entry.songArtist?.trim() || "";
+  const title = entry.songTitle.trim()
+  const artist = entry.songArtist?.trim() || ""
 
-  if (!artist) return title;
-  return `${title} – ${artist}`;
+  if (!artist) return title
+  return `${title} – ${artist}`
 }
 
 export default function FinalResults() {
@@ -62,7 +59,6 @@ export default function FinalResults() {
 
       console.log("[v0] 🏆 Calculating final results for game:", game.id)
 
-      // Get all players
       const { data: players } = await supabase
         .from("game_players")
         .select("*")
@@ -76,17 +72,13 @@ export default function FinalResults() {
 
       console.log("[v0] 👥 Total players:", players.length)
 
-      // Get all placement votes across all rounds
       const { data: placements } = await supabase.from("leaderboard_placements").select("*").eq("game_id", game.id)
 
       console.log("[v0] 📊 Total placements:", placements?.length || 0)
 
       const playerScores = players.map((player, index) => {
-        // Get all votes for this player's song
         const votesForPlayer = placements?.filter((p) => p.song_player_id === player.id) || []
 
-        // Calculate total score (lower placement = more points)
-        // 1st place = playerCount points, 2nd = playerCount-1, etc.
         const totalScore = votesForPlayer.reduce((sum, vote) => {
           const points = players.length - vote.placement_position + 1
           return sum + points
@@ -96,7 +88,6 @@ export default function FinalResults() {
 
         console.log("[v0] 🎯", player.player_name, "- Total votes:", votesForPlayer.length, "Score:", avgScore)
 
-        // Ensure we always have song data, even if missing
         return {
           playerId: player.id,
           playerName: player.player_name || "Unknown Player",
@@ -108,7 +99,6 @@ export default function FinalResults() {
         }
       })
 
-      // Sort by score (highest first)
       const sortedResults = playerScores.sort((a, b) => b.score - a.score)
 
       console.log("[v0] 🏆 Final standings:")
@@ -140,7 +130,6 @@ export default function FinalResults() {
         })
         .catch((err) => console.log("[v0] Share failed:", err))
     } else {
-      // Fallback: copy to clipboard
       navigator.clipboard.writeText(shareText)
       alert("Results copied to clipboard!")
     }
@@ -162,7 +151,27 @@ export default function FinalResults() {
   const [first, second, third] = topThree
 
   return (
-    <div className="min-h-screen bg-[#000022] text-white flex flex-col items-center justify-start px-6 py-12 overflow-y-auto">
+    <div className="min-h-screen bg-[#000022] text-white flex flex-col items-center justify-start px-6 py-12 overflow-y-auto relative">
+      {/* 🎉 Confetti overlay */}
+      <div className="pointer-events-none fixed inset-0 z-40 overflow-hidden">
+        {Array.from({ length: 40 }).map((_, i) => (
+          <span
+            key={i}
+            className="absolute inline-block"
+            style={{
+              left: `${(i / 40) * 100}%`,
+              top: "-10%",
+              animation: "confetti-fall 1600ms ease-out forwards",
+              animationDelay: `${(i % 10) * 80}ms`,
+              fontSize: i % 3 === 0 ? "1.6rem" : "1.2rem",
+              transform: `rotate(${i % 2 === 0 ? "-15deg" : "15deg"})`,
+            }}
+          >
+            {i % 3 === 0 ? "🎉" : i % 3 === 1 ? "🎵" : "✨"}
+          </span>
+        ))}
+      </div>
+
       <h1
         className="text-[2.5rem] font-black text-center mb-8 leading-tight"
         style={{
@@ -362,5 +371,21 @@ export default function FinalResults() {
         </div>
       </div>
     </div>
+
+      <style jsx>{`
+        @keyframes confetti-fall {
+          0% {
+            transform: translate3d(0, -20%, 0) rotate(0deg);
+            opacity: 1;
+          }
+          70% {
+            opacity: 1;
+          }
+          100% {
+            transform: translate3d(0, 120vh, 0) rotate(360deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
   )
 }
