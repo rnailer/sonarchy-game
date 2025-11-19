@@ -216,7 +216,6 @@ export default function SonarchySplash() {
             style={{
               width: "100%",
               height: "auto",
-              filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
             }}
             priority
             onLoad={() => addDebug("Speaker background loaded")}
@@ -255,7 +254,7 @@ export default function SonarchySplash() {
           position: "absolute",
           zIndex: 10,
           top: "493px",
-          right: "-40px",
+          right: "0px",
           maxWidth: "221px",
         }}
       >
