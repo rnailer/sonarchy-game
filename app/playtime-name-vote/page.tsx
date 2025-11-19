@@ -31,133 +31,11 @@ export default function PlaytimeNameVote() {
   const [showVotes, setShowVotes] = useState(0)
   const [showOverlay, setShowOverlay] = useState(false)
   const [voteResult, setVoteResult] = useState<"hide" | "show" | null>(null)
-  const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [isSavingVote, setIsSavingVote] = useState(false)
 
-  const addDebug = (msg: string) => {
-    console.log(`[v0] ${msg}`)
-    setDebugInfo((prev) => [...prev.slice(-5), `${new Date().toLocaleTimeString()}: ${msg}`])
-  }
 
-  useEffect(() => {
-    addDebug(`Page loaded. GameCode: ${gameCode || "MISSING"}`)
-  }, [])
 
-  useEffect(() => {
-    const fetchPlayerCount = async () => {
-      if (!gameCode) {
-        addDebug("No game code provided")
-        setIsLoadingPlayers(false)
-        return
-      }
 
-      const supabase = createClient()
-      if (!supabase) {
-        addDebug("Supabase client not available")
-        setIsLoadingPlayers(false)
-        return
-      }
-
-      addDebug("Fetching game and player data...")
-      const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
-
-      if (game) {
-        setGameId(game.id)
-        addDebug(`Game ID: ${game.id}`)
-
-        const { data: players, error } = await supabase.from("game_players").select("id").eq("game_id", game.id)
-
-        if (!error && players) {
-          addDebug(`Player count: ${players.length}`)
-          setTotalPlayers(players.length)
-
-          const userId = localStorage.getItem(`player_id_${gameCode}`)
-          setCurrentUserId(userId)
-          addDebug(`Current user ID from localStorage: ${userId || "NOT FOUND"}`)
-
-          if (!userId) {
-            addDebug("WARNING: No player ID in localStorage - voting will not work!")
-          }
-        } else {
-          addDebug(`Error fetching players: ${error?.message}`)
-        }
-      } else {
-        addDebug("Game not found in database")
-      }
-
-      setIsLoadingPlayers(false)
-    }
-
-    fetchPlayerCount()
-  }, [gameCode])
-
-  useEffect(() => {
-    if (!gameId || !currentUserId) {
-      addDebug(`Skipping vote sync - gameId: ${gameId || "NULL"}, currentUserId: ${currentUserId || "NULL"}`)
-      return
-    }
-
-    const supabase = createClient()
-    if (!supabase) {
-      addDebug("Supabase not available for vote sync")
-      return
-    }
-
-    addDebug("Setting up vote sync...")
-
-    const fetchVotes = async () => {
-      const { data: players, error } = await supabase.from("game_players").select("id, name_vote").eq("game_id", gameId)
-
-      if (error) {
-        addDebug(`Error fetching votes: ${error.message}`)
-        return
-      }
-
-      if (players) {
-        const hide = players.filter((p) => p.name_vote === "hide").length
-        const show = players.filter((p) => p.name_vote === "show").length
-
-        setHideVotes(hide)
-        setShowVotes(show)
-        addDebug(`Vote counts updated - Hide: ${hide}, Show: ${show} (from ${players.length} players)`)
-
-        // Check if current user has voted
-        const currentPlayer = players.find((p) => p.id === currentUserId)
-        if (currentPlayer?.name_vote) {
-          setSelectedVote(currentPlayer.name_vote as "hide" | "show")
-          addDebug(`Current user vote: ${currentPlayer.name_vote}`)
-        } else {
-          setSelectedVote(null)
-        }
-      }
-    }
-
-    fetchVotes()
-
-    // Subscribe to vote changes
-    const channel = supabase
-      .channel(`game_${gameId}_votes`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*", // Listen to all events (INSERT, UPDATE, DELETE)
-          schema: "public",
-          table: "game_players",
-          filter: `game_id=eq.${gameId}`,
-        },
-        (payload) => {
-          addDebug(`Vote change detected: ${payload.eventType}`)
-          fetchVotes()
-        },
-      )
-      .subscribe((status) => {
-        addDebug(`Vote subscription status: ${status}`)
-      })
-
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [gameId, currentUserId])
 
   useEffect(() => {
     if (currentRound > 1 && hasVotedBefore) {
@@ -190,54 +68,43 @@ export default function PlaytimeNameVote() {
   }, [timeRemaining, hideVotes, showVotes, router, selectedCategory, gameCode])
 
   const handleVote = async (vote: "hide" | "show") => {
-    addDebug(`🔘 Vote button clicked: ${vote}`)
-
     if (isSavingVote) {
-      addDebug("⏳ Vote already in progress, ignoring click")
       return
     }
 
     if (selectedVote === vote) {
-      addDebug("✓ Already voted for this option")
       return
     }
 
     if (!currentUserId) {
-      addDebug("❌ ERROR: No user ID found")
       alert("Cannot vote: No player ID found. Please rejoin the game.")
       return
     }
 
     if (!gameCode) {
-      addDebug("❌ ERROR: No game code")
       return
     }
 
     const supabase = createClient()
     if (!supabase) {
-      addDebug("❌ ERROR: Supabase not available")
       return
     }
 
     setIsSavingVote(true)
-    addDebug(`💾 Saving vote to database...`)
 
     try {
       const { error } = await supabase.from("game_players").update({ name_vote: vote }).eq("id", currentUserId)
 
       if (error) {
-        addDebug(`❌ Database error: ${error.message}`)
         alert(`Vote failed: ${error.message}`)
         return
       }
 
       setSelectedVote(vote)
-      addDebug(`✅ Vote saved successfully: ${vote}`)
 
       // Don't update local counts - let the realtime subscription handle it
       // This ensures all players see the same counts
     } catch (err) {
-      addDebug(`❌ Exception: ${err}`)
       alert("Vote failed. Please try again.")
     } finally {
       setIsSavingVote(false)
@@ -262,21 +129,6 @@ export default function PlaytimeNameVote() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col">
-      <div className="fixed top-0 left-0 right-0 z-[200] bg-red-600 text-white p-2 text-[10px] max-h-24 overflow-y-auto">
-        <div className="font-bold">DEBUG: playtime-name-vote</div>
-        <div>
-          GameID: {gameId?.slice(0, 8)}... | UserID: {currentUserId?.slice(0, 8)}...
-        </div>
-        <div>
-          Votes - Hide: {hideVotes} | Show: {showVotes} | Selected: {selectedVote || "NONE"}
-        </div>
-        {debugInfo.slice(-2).map((info, i) => (
-          <div key={i} className="truncate">
-            {info}
-          </div>
-        ))}
-      </div>
-
       <header className="fixed top-[60px] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href="/players-locked-in">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 w-[24px] h-[24px] p-0">

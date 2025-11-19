@@ -9,6 +9,8 @@ import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = false
+
 interface Player {
   id: string
   player_name: string
@@ -95,7 +97,7 @@ export default function PlayersLockedIn() {
   const supabase = createClient()
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
 
   const addDebugLog = (message: string) => {
     console.log("[v0]", message)
@@ -495,7 +497,7 @@ export default function PlayersLockedIn() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col relative overflow-hidden">
-      {showDebug && debugInfo.length > 0 && (
+      {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
         <div
           className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-40 overflow-y-auto"
           onClick={() => setShowDebug(false)}

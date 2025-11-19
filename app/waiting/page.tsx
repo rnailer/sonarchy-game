@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = false
+
 interface EmojiParticle {
   id: string
   emoji: string
@@ -48,6 +50,7 @@ export default function Waiting() {
   const [avatarImage, setAvatarImage] = useState("/jukebox-sq.png")
   const supabase = createClient()
   const [debugInfo, setDebugInfo] = useState<string[]>([`⏳ Waiting for category...`])
+  const [showDebug, setShowDebug] = useState(true)
 
   const [timeRemaining, setTimeRemaining] = useState(60)
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -308,9 +311,12 @@ export default function Waiting() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col relative overflow-hidden">
-      {debugInfo.length > 0 && (
-        <div className="fixed top-2 left-2 right-2 z-[100] bg-black/90 text-green-400 text-xs p-3 rounded-lg border border-green-500 font-mono max-h-32 overflow-y-auto">
-          <div className="font-bold mb-1">🐛 Debug Info:</div>
+      {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
+        <div
+          className="fixed top-2 left-2 right-2 z-[100] bg-black/90 text-green-400 text-xs p-3 rounded-lg border border-green-500 font-mono max-h-32 overflow-y-auto"
+          onClick={() => setShowDebug(false)}
+        >
+          <div className="font-bold mb-1">🐛 Debug Info (tap to hide):</div>
           {debugInfo.map((info, i) => (
             <div key={i}>{info}</div>
           ))}

@@ -12,6 +12,8 @@ import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = false
+
 declare global {
   interface Window {
     onSpotifyWebPlaybackSDKReady: () => void
@@ -89,7 +91,7 @@ export default function PlaytimePlayback() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
 
   const voteSubscription = useRef<any>(null) // Changed from state to ref
 
@@ -1028,7 +1030,7 @@ export default function PlaytimePlayback() {
     return (
       <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
         {/* Added debug panel to loading screen */}
-        {showDebug && debugInfo.length > 0 && (
+        {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
           <div
             className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-48 overflow-y-auto"
             onClick={() => setShowDebug(false)}
@@ -1054,7 +1056,7 @@ export default function PlaytimePlayback() {
   if (loadError) {
     return (
       <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
-        {showDebug && debugInfo.length > 0 && (
+        {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
           <div
             className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-48 overflow-y-auto"
             onClick={() => setShowDebug(false)}
@@ -1104,7 +1106,7 @@ export default function PlaytimePlayback() {
     return (
       <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
         {/* Added debug panel to no player data screen */}
-        {showDebug && debugInfo.length > 0 && (
+        {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
           <div
             className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-48 overflow-y-auto"
             onClick={() => setShowDebug(false)}
@@ -1133,7 +1135,7 @@ export default function PlaytimePlayback() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col">
-      {showDebug && debugInfo.length > 0 && (
+      {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
         <div
           className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-48 overflow-y-auto"
           onClick={() => setShowDebug(false)}

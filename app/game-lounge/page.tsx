@@ -1,4 +1,7 @@
+
 "use client"
+
+const SHOW_DEBUG = false;
 
 import type React from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -98,7 +101,7 @@ function GameLoungeContent() {
     lastError: "",
     isJoining: false,
   })
-  const [showDebug, setShowDebug] = useState(true)
+  const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
 
   const [isSupabaseAvailable, setIsSupabaseAvailable] = useState(false)
   const [activeTab, setActiveTab] = useState<"players" | "chat">("players")
@@ -1073,7 +1076,7 @@ function GameLoungeContent() {
 
   return (
     <div className="min-h-screen bg-[#000033] text-white flex flex-col">
-      {showDebug && (
+      {SHOW_DEBUG && showDebug && (
         <div
           className="fixed top-2 left-2 right-2 z-[200] bg-red-600 text-white text-xs p-3 rounded-lg max-h-40 overflow-y-auto"
           onClick={() => setShowDebug(false)}

@@ -7,6 +7,8 @@ import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = false
+
 export default function GameStarting() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -132,12 +134,14 @@ export default function GameStarting() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col">
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-2 text-xs max-h-32 overflow-y-auto">
-        <div className="font-bold">DEBUG: game-starting</div>
-        {debugInfo.map((info, i) => (
-          <div key={i}>{info}</div>
-        ))}
-      </div>
+      {SHOW_DEBUG && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-2 text-xs max-h-32 overflow-y-auto">
+          <div className="font-bold">DEBUG: game-starting</div>
+          {debugInfo.map((info, i) => (
+            <div key={i}>{info}</div>
+          ))}
+        </div>
+      )}
 
       <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href={`/game-lounge?code=${gameCode}`}>

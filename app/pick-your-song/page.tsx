@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { savePlayerData, getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
+
 import { checkDuplicateSpotifyAccounts } from "@/app/actions/spotify"
+
+const SHOW_DEBUG = false
 
 interface SpotifyTrack {
   id: string
@@ -673,14 +676,16 @@ export default function PickYourSong() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col relative overflow-hidden">
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white p-3 text-xs max-h-48 overflow-y-auto">
-        <div className="font-bold mb-1">🔍 DEBUG: Token & Search Status</div>
-        {debugInfo.map((info, i) => (
-          <div key={i} className="font-mono">
-            {info}
-          </div>
-        ))}
-      </div>
+      {SHOW_DEBUG && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white p-3 text-xs max-h-48 overflow-y-auto">
+          <div className="font-bold mb-1">🔍 DEBUG: Token & Search Status</div>
+          {debugInfo.map((info, i) => (
+            <div key={i} className="font-mono">
+              {info}
+            </div>
+          ))}
+        </div>
+      )}
 
       <header className="fixed top-[160px] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href="/category-selected">

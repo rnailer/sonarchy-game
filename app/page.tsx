@@ -1,4 +1,5 @@
-// Test deployment update - Richard
+"// Test deployment update - Richard
+const SHOW_DEBUG = false
 "use client"
 
 import { useEffect, useState } from "react"
@@ -14,7 +15,7 @@ export default function SonarchySplash() {
 
   const addDebug = (message: string) => {
     console.log(`[v0] ${message}`)
-    setDebugInfo((prev) => [...prev, message])
+    setDebugInfo((prev) => [...prev.slice(-8), message])
   }
 
   useEffect(() => {
@@ -85,7 +86,7 @@ export default function SonarchySplash() {
         alignItems: "center",
       }}
     >
-      {debugInfo.length > 0 && (
+      {SHOW_DEBUG && debugInfo.length > 0 && (
         <div
           style={{
             position: "fixed",

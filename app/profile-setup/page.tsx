@@ -1,4 +1,7 @@
+
 "use client"
+
+const SHOW_DEBUG = false
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -29,6 +32,7 @@ function ProfileSetupContent() {
   const [isSpotifyConnected, setIsSpotifyConnected] = useState(false)
   const [isConnecting, setIsConnecting] = useState(false)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
 
   useEffect(() => {
     setDebugInfo([`✅ Profile setup page loaded`, `🔍 Checking existing tokens...`])
@@ -313,14 +317,19 @@ function ProfileSetupContent() {
 
   return (
     <div className="min-h-screen bg-[#000033] text-white flex flex-col p-9">
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-blue-600 text-white p-3 text-xs max-h-48 overflow-y-auto">
-        <div className="font-bold mb-1">🔍 DEBUG: Profile Setup</div>
-        {debugInfo.map((info, i) => (
-          <div key={i} className="font-mono">
-            {info}
-          </div>
-        ))}
-      </div>
+      {SHOW_DEBUG && showDebug && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[100] bg-blue-600 text-white p-3 text-xs max-h-48 overflow-y-auto"
+          onClick={() => setShowDebug(false)}
+        >
+          <div className="font-bold mb-1">🔍 DEBUG: Profile Setup (tap to hide)</div>
+          {debugInfo.map((info, i) => (
+            <div key={i} className="font-mono">
+              {info}
+            </div>
+          ))}
+        </div>
+      )}
 
       <h1
         className="text-[28px] font-black text-center mb-8 mt-20 bg-clip-text text-transparent"

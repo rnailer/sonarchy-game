@@ -1,4 +1,7 @@
+
 "use client"
+
+const SHOW_DEBUG = false
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -89,8 +92,10 @@ export default function SelectCategory() {
   const supabase = createClient()
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
+  const [showDebug, setShowDebug] = useState(true)
 
   const addDebug = (msg: string) => {
+    if (!SHOW_DEBUG) return;
     setDebugInfo((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`])
   }
 
@@ -198,12 +203,17 @@ export default function SelectCategory() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col relative overflow-hidden">
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-2 text-xs max-h-32 overflow-y-auto">
-        <div className="font-bold">DEBUG: select-category</div>
-        {debugInfo.map((info, i) => (
-          <div key={i}>{info}</div>
-        ))}
-      </div>
+      {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-2 text-xs max-h-32 overflow-y-auto"
+          onClick={() => setShowDebug(false)}
+        >
+          <div className="font-bold">DEBUG: select-category (tap to hide)</div>
+          {debugInfo.map((info, i) => (
+            <div key={i}>{info}</div>
+          ))}
+        </div>
+      )}
 
       <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href="/game-starting">
@@ -231,7 +241,7 @@ export default function SelectCategory() {
 
       <div className="fixed top-[120px] left-0 right-0 z-40 bg-[#000022] px-9">
         <p className="text-[14px] font-normal mb-3 text-left" style={{ color: "#B9F3FF" }}>
-          Your up first {playerName}, one minute to pick.
+          You're up first {playerName}, one minute to pick.
         </p>
 
         <div
@@ -303,7 +313,7 @@ export default function SelectCategory() {
               setCategoryInput(e.target.value)
               setSelectedPreset(null)
             }}
-            placeholder="Type category selction here..."
+            placeholder="Type category selection here..."
             className="w-full text-white rounded-2xl px-4 outline-none mb-3"
             style={{
               background: "#000022",

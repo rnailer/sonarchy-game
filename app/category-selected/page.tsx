@@ -7,6 +7,8 @@ import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = false
+
 export default function CategorySelected() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -16,16 +18,19 @@ export default function CategorySelected() {
   const [isMuted, setIsMuted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
+
+  const addDebug = (msg: string) => {
+    setDebugInfo((prev) => [...prev.slice(-8), `${new Date().toLocaleTimeString()}: ${msg}`])
+  }
+
   const [selectingPlayerId, setSelectingPlayerId] = useState<string | null>(null)
   const [isMyTurn, setIsMyTurn] = useState(false)
 
   useEffect(() => {
-    setDebugInfo([
-      `✓ Page loaded: category-selected`,
-      `📝 Game Code: ${gameCode || "MISSING!"}`,
-      `🎵 Category: ${selectedCategory}`,
-      `🔗 Current URL: ${window.location.href}`,
-    ])
+    addDebug(`✓ Page loaded: category-selected`)
+    addDebug(`📝 Game Code: ${gameCode || "MISSING!"}`)
+    addDebug(`🎵 Category: ${selectedCategory}`)
+    addDebug(`🔗 Current URL: ${window.location.href}`)
 
     const checkIfMyTurn = async () => {
       if (!gameCode) return
@@ -55,12 +60,9 @@ export default function CategorySelected() {
       setIsMyTurn(amINext)
       setSelectingPlayerId(amINext ? myPlayerId : null)
 
-      setDebugInfo((prev) => [
-        ...prev,
-        `👤 My player ID: ${myPlayerId}`,
-        `👤 Am I selecting? ${amINext}`,
-        `👥 Players needing selection: ${playersNeedingSelection.length}`,
-      ])
+      addDebug(`👤 My player ID: ${myPlayerId}`)
+      addDebug(`👤 Am I selecting? ${amINext}`)
+      addDebug(`👥 Players needing selection: ${playersNeedingSelection.length}`)
     }
 
     checkIfMyTurn()
@@ -71,7 +73,7 @@ export default function CategorySelected() {
       if (gameCode && selectedCategory) {
         // Save to localStorage for immediate access
         localStorage.setItem(`category_${gameCode}`, selectedCategory)
-        setDebugInfo((prev) => [...prev, `✓ Stored category in localStorage`])
+        addDebug(`✓ Stored category in localStorage`)
 
         // Save to Supabase for realtime updates to other players
         const supabase = createClient()
@@ -82,10 +84,10 @@ export default function CategorySelected() {
 
         if (error) {
           console.error("[v0] Error updating category in Supabase:", error)
-          setDebugInfo((prev) => [...prev, `❌ Supabase update failed: ${error.message}`])
+          addDebug(`❌ Supabase update failed: ${error.message}`)
         } else {
           console.log("[v0] Category updated in Supabase successfully")
-          setDebugInfo((prev) => [...prev, `✓ Updated category in Supabase`])
+          addDebug(`✓ Updated category in Supabase`)
         }
       }
     }
@@ -125,12 +127,9 @@ export default function CategorySelected() {
     } else {
       setTimeout(() => {
         const targetUrl = `/pick-your-song?code=${gameCode}&category=${encodeURIComponent(selectedCategory)}`
-        setDebugInfo((prev) => [
-          ...prev,
-          `🎯 NAVIGATING to pick-your-song`,
-          `📍 Target: /pick-your-song`,
-          `🔗 Full URL: ${targetUrl}`,
-        ])
+        addDebug(`🎯 NAVIGATING to pick-your-song`)
+        addDebug(`📍 Target: /pick-your-song`)
+        addDebug(`🔗 Full URL: ${targetUrl}`)
         console.log("[v0] ✅ Navigating to pick-your-song:", targetUrl)
         router.push(targetUrl)
       }, 1000)
@@ -139,12 +138,14 @@ export default function CategorySelected() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col">
-      <div className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-3 text-xs max-h-40 overflow-y-auto">
-        <div className="font-bold mb-1">DEBUG: category-selected</div>
-        {debugInfo.map((info, i) => (
-          <div key={i}>{info}</div>
-        ))}
-      </div>
+      {SHOW_DEBUG && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-green-600 text-white p-3 text-xs max-h-40 overflow-y-auto">
+          <div className="font-bold mb-1">DEBUG: category-selected</div>
+          {debugInfo.map((info, i) => (
+            <div key={i}>{info}</div>
+          ))}
+        </div>
+      )}
 
       <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href={`/select-category?code=${gameCode}`}>
