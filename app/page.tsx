@@ -1,12 +1,15 @@
-/* Test deployment update - Richard */
-const SHOW_DEBUG = false
 "use client"
+
+ /* Test deployment update - Richard */
+const SHOW_DEBUG = false
 
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+
+// ...rest of the file stays the same
 
 export default function SonarchySplash() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true)
