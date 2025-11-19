@@ -253,9 +253,10 @@ export default function SonarchySplash() {
         style={{
           position: "absolute",
           zIndex: 10,
-          top: "493px",
+          bottom: "130px", // sits above the Get Started button
           right: "0px",
-          maxWidth: "221px",
+          maxWidth: "180px",
+          pointerEvents: "none", // so it never blocks taps
         }}
       >
         <Image
@@ -264,9 +265,9 @@ export default function SonarchySplash() {
           width={221}
           height={216}
           style={{
-            width: "auto",
+            width: "100%",
             height: "auto",
-            maxWidth: "221px",
+            maxWidth: "180px",
             filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
           }}
           onLoad={() => addDebug("Walkman character loaded")}
