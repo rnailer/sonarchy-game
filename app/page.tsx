@@ -224,28 +224,28 @@ export default function SonarchySplash() {
         </div>
       </div>
 
-      <div
+                  <div
         style={{
           position: "absolute",
           zIndex: 10,
-          top: "503px",
-          left: "7px",
-          maxWidth: "187px",
+          bottom: "120px", // same baseline as MP3 player
+          right: "-10px",
+          maxWidth: "180px",
         }}
       >
         <Image
-          src="/mp3-left.png"
-          alt="Dancing MP3 Player Character"
-          width={187}
-          height={214}
+          src="/walkman-right.png"
+          alt="Dancing Walkman Character"
+          width={221}
+          height={216}
           style={{
-            width: "auto",
+            width: "100%",
             height: "auto",
-            maxWidth: "187px",
+            maxWidth: "180px",
             filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
           }}
-          onLoad={() => addDebug("MP3 character loaded")}
-          onError={() => addDebug("MP3 character failed to load")}
+          onLoad={() => addDebug("Walkman character loaded")}
+          onError={() => addDebug("Walkman character failed to load")}
         />
       </div>
 
