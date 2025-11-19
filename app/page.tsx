@@ -1,4 +1,4 @@
-"// Test deployment update - Richard
+/* Test deployment update - Richard */
 const SHOW_DEBUG = false
 "use client"
 
