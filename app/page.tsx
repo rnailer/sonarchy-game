@@ -1,6 +1,6 @@
 "use client"
 
- /* Test deployment update - Richard */
+ /* Test deployment update - Richards */
 const SHOW_DEBUG = false
 
 import { useEffect, useState } from "react"
@@ -34,7 +34,7 @@ export default function SonarchySplash() {
           data: { session },
         } = await supabase.auth.getSession()
         addDebug(`Auth check complete. Session: ${session ? "exists" : "none"}`)
-        setIsCheckingAuth(false)
+        setIsCheckingAuth(false) 
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : String(error)
         addDebug(`Auth check error: ${errorMsg}`)
@@ -216,6 +216,7 @@ export default function SonarchySplash() {
             style={{
               width: "100%",
               height: "auto",
+              filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
             }}
             priority
             onLoad={() => addDebug("Speaker background loaded")}
@@ -224,28 +225,28 @@ export default function SonarchySplash() {
         </div>
       </div>
 
-                  <div
+      <div
         style={{
           position: "absolute",
           zIndex: 10,
-          bottom: "120px", // same baseline as MP3 player
-          right: "-10px",
-          maxWidth: "180px",
+          top: "503px",
+          left: "7px",
+          maxWidth: "187px",
         }}
       >
         <Image
-          src="/walkman-right.png"
-          alt="Dancing Walkman Character"
-          width={221}
-          height={216}
+          src="/mp3-left.png"
+          alt="Dancing MP3 Player Character"
+          width={187}
+          height={214}
           style={{
-            width: "100%",
+            width: "auto",
             height: "auto",
-            maxWidth: "180px",
+            maxWidth: "187px",
             filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
           }}
-          onLoad={() => addDebug("Walkman character loaded")}
-          onError={() => addDebug("Walkman character failed to load")}
+          onLoad={() => addDebug("MP3 character loaded")}
+          onError={() => addDebug("MP3 character failed to load")}
         />
       </div>
 
@@ -253,10 +254,9 @@ export default function SonarchySplash() {
         style={{
           position: "absolute",
           zIndex: 10,
-          bottom: "130px", // sits above the Get Started button
-          right: "0px",
-          maxWidth: "180px",
-          pointerEvents: "none", // so it never blocks taps
+          top: "493px",
+          right: "-40px",
+          maxWidth: "221px",
         }}
       >
         <Image
@@ -265,9 +265,9 @@ export default function SonarchySplash() {
           width={221}
           height={216}
           style={{
-            width: "100%",
+            width: "auto",
             height: "auto",
-            maxWidth: "180px",
+            maxWidth: "221px",
             filter: "drop-shadow(0 25px 25px rgba(0, 0, 0, 0.5))",
           }}
           onLoad={() => addDebug("Walkman character loaded")}

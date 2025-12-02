@@ -12,7 +12,7 @@ import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
 
-const SHOW_DEBUG = false
+const SHOW_DEBUG = true
 
 declare global {
   interface Window {
