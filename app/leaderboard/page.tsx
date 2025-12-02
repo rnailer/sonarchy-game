@@ -6,7 +6,6 @@ import Link from "next/link"
 import { ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
-import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -33,14 +32,9 @@ export default function Leaderboard() {
   const [currentRound, setCurrentRound] = useState(1)
   const [gameId, setGameId] = useState<string | null>(null)
 
-  // Server-synchronized timer
-  const { timeRemaining, isExpired: showTimeUp, startTimer } = useServerTimer({
-    gameId: gameId || "",
-    timerType: "leaderboard",
-    enabled: !!gameId,
-  })
+  const [timeRemaining, setTimeRemaining] = useState(15)
+  const [showTimeUp, setShowTimeUp] = useState(false)
   const [timeUpDuration, setTimeUpDuration] = useState(0)
-  const timerStartedRef = useRef(false)
 
   const [currentSong, setCurrentSong] = useState<any>(null)
   const [allPlayers, setAllPlayers] = useState<any[]>([])
@@ -69,12 +63,6 @@ export default function Leaderboard() {
       if (game) {
         setGameId(game.id)
         setCurrentRound(game.current_round || 1)
-
-        // Start the server timer (all clients can call this, it will sync)
-        if (!timerStartedRef.current) {
-          timerStartedRef.current = true
-          startTimer(15).catch(console.error)
-        }
 
         const { data: players } = await supabase
           .from("game_players")
@@ -139,6 +127,15 @@ export default function Leaderboard() {
 
     fetchCurrentSong()
   }, [currentSongPlayerId])
+
+  useEffect(() => {
+    if (timeRemaining > 0 && !showTimeUp) {
+      const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
+      return () => clearTimeout(timer)
+    } else if (timeRemaining === 0 && !showTimeUp) {
+      setShowTimeUp(true)
+    }
+  }, [timeRemaining, showTimeUp])
 
   // Track how long we've been in TIME UP state
   useEffect(() => {

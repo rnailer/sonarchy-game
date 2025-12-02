@@ -11,7 +11,6 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
-import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const SHOW_DEBUG = true
 
@@ -54,15 +53,9 @@ export default function PlaytimePlayback() {
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
-  const [gameId, setGameId] = useState<string | null>(null)
 
-  // Server-synchronized timer
-  const { timeRemaining, isExpired, startTimer } = useServerTimer({
-    gameId: gameId || "",
-    timerType: "song",
-    enabled: !!gameId && !!playerData,
-  })
-  const timerStartedRef = useRef(false)
+  const [timeRemaining, setTimeRemaining] = useState(30) // Changed from 15 to 30 seconds for voting time
+  // </CHANGE>
 
   const [isMuted, setIsMuted] = useState(false)
   const [skipVotes, setSkipVotes] = useState(0)
@@ -165,7 +158,6 @@ export default function PlaytimePlayback() {
         return
       }
 
-      setGameId(game.id)
       addDebugLog(`✅ Game ID: ${game.id}`)
       addDebugLog(`👑 Host user ID: ${game.host_user_id}`)
       addDebugLog(`🎵 Current song player ID: ${game.current_song_player_id || "NONE - need to select next song"}`)
@@ -199,12 +191,6 @@ export default function PlaytimePlayback() {
           const storedPlayerId = localStorage.getItem(`player_id_${gameCode}`)
           if (storedPlayerId) {
             setCurrentUserId(storedPlayerId)
-          }
-
-          // Start the server timer for this song
-          if (!timerStartedRef.current) {
-            timerStartedRef.current = true
-            startTimer(30).catch(console.error)
           }
 
           setIsLoadingPlayer(false)
@@ -276,12 +262,6 @@ export default function PlaytimePlayback() {
       const storedPlayerId = localStorage.getItem(`player_id_${gameCode}`)
       if (storedPlayerId) {
         setCurrentUserId(storedPlayerId)
-      }
-
-      // Start the server timer for this song
-      if (!timerStartedRef.current) {
-        timerStartedRef.current = true
-        startTimer(30).catch(console.error)
       }
 
       setIsLoadingPlayer(false)
