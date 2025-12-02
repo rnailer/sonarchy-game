@@ -11,6 +11,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const SHOW_DEBUG = true
 
@@ -53,9 +54,15 @@ export default function PlaytimePlayback() {
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [gameId, setGameId] = useState<string | null>(null)
 
-  const [timeRemaining, setTimeRemaining] = useState(30) // Changed from 15 to 30 seconds for voting time
-  // </CHANGE>
+  // Server-synchronized timer
+  const { timeRemaining, isExpired, startTimer } = useServerTimer({
+    gameId: gameId || "",
+    timerType: "song",
+    enabled: !!gameId && !!playerData,
+  })
+  const timerStartedRef = useRef(false)
 
   const [isMuted, setIsMuted] = useState(false)
   const [skipVotes, setSkipVotes] = useState(0)
@@ -158,6 +165,7 @@ export default function PlaytimePlayback() {
         return
       }
 
+      setGameId(game.id)
       addDebugLog(`✅ Game ID: ${game.id}`)
       addDebugLog(`👑 Host user ID: ${game.host_user_id}`)
       addDebugLog(`🎵 Current song player ID: ${game.current_song_player_id || "NONE - need to select next song"}`)
@@ -193,6 +201,12 @@ export default function PlaytimePlayback() {
             setCurrentUserId(storedPlayerId)
           }
 
+          // Start the server timer for this song
+          if (!timerStartedRef.current) {
+            timerStartedRef.current = true
+            startTimer(30).catch(console.error)
+          }
+
           setIsLoadingPlayer(false)
           return
         }
@@ -218,8 +232,10 @@ export default function PlaytimePlayback() {
 
       if (!allPlayers || allPlayers.length === 0) {
         addDebugLog("✅ All songs have been played! Navigating to round completion...")
+        // Use the last song's player ID (current_song_player_id) for navigation
+        const lastSongPlayerId = game.current_song_player_id || ""
         router.push(
-          `/leaderboard?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&roundComplete=true&t=${Date.now()}`,
+          `/leaderboard?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&playerId=${lastSongPlayerId}&roundComplete=true&t=${Date.now()}`,
         )
         return
       }
@@ -260,6 +276,12 @@ export default function PlaytimePlayback() {
       const storedPlayerId = localStorage.getItem(`player_id_${gameCode}`)
       if (storedPlayerId) {
         setCurrentUserId(storedPlayerId)
+      }
+
+      // Start the server timer for this song
+      if (!timerStartedRef.current) {
+        timerStartedRef.current = true
+        startTimer(30).catch(console.error)
       }
 
       setIsLoadingPlayer(false)

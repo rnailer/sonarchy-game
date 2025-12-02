@@ -1,0 +1,179 @@
+/**
+ * React hook for server-synchronized timers
+ */
+
+import { useState, useEffect, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
+
+interface UseServerTimerOptions {
+  gameId: string
+  timerType: "song" | "leaderboard" | "category_selection" | "waiting" | "name_vote"
+  onExpire?: () => void
+  enabled?: boolean
+}
+
+interface UseServerTimerReturn {
+  timeRemaining: number
+  isExpired: boolean
+  startTimer: (duration: number) => Promise<void>
+}
+
+const FIELD_MAP = {
+  song: "song_start_time",
+  leaderboard: "leaderboard_start_time",
+  category_selection: "category_selection_start_time",
+  waiting: "waiting_start_time",
+  name_vote: "name_vote_start_time",
+} as const
+
+/**
+ * Hook for server-synchronized timers
+ *
+ * Usage:
+ * ```tsx
+ * const { timeRemaining, isExpired, startTimer } = useServerTimer({
+ *   gameId,
+ *   timerType: "leaderboard",
+ *   onExpire: () => setShowTimeUp(true),
+ * })
+ *
+ * // Start the timer (usually only the host does this)
+ * await startTimer(15) // 15 seconds
+ * ```
+ */
+export function useServerTimer(options: UseServerTimerOptions): UseServerTimerReturn {
+  const { gameId, timerType, onExpire, enabled = true } = options
+  const [timeRemaining, setTimeRemaining] = useState(0)
+  const [isExpired, setIsExpired] = useState(false)
+  const onExpireRef = useRef(onExpire)
+
+  // Keep onExpire ref up to date
+  useEffect(() => {
+    onExpireRef.current = onExpire
+  }, [onExpire])
+
+  const startTimer = async (duration: number) => {
+    const supabase = createClient()
+    const now = new Date().toISOString()
+
+    const field = FIELD_MAP[timerType]
+    const durationField = field.replace("_start_time", "_duration")
+
+    await supabase
+      .from("games")
+      .update({
+        [field]: now,
+        [durationField]: duration,
+      })
+      .eq("id", gameId)
+
+    console.log(`[ServerTimer] Started ${timerType} timer for ${duration}s at ${now}`)
+  }
+
+  useEffect(() => {
+    if (!enabled || !gameId) return
+
+    const supabase = createClient()
+    const field = FIELD_MAP[timerType]
+    const durationField = field.replace("_start_time", "_duration")
+
+    let intervalId: NodeJS.Timeout | null = null
+    let startTimeCache: string | null = null
+    let durationCache: number | null = null
+
+    const calculateRemaining = () => {
+      if (!startTimeCache || !durationCache) return 0
+
+      const start = new Date(startTimeCache).getTime()
+      const now = Date.now()
+      const elapsed = Math.floor((now - start) / 1000)
+      const remaining = durationCache - elapsed
+
+      return remaining
+    }
+
+    const updateTimer = () => {
+      const remaining = calculateRemaining()
+      setTimeRemaining(Math.max(0, remaining))
+
+      if (remaining <= 0 && !isExpired) {
+        setIsExpired(true)
+        onExpireRef.current?.()
+      }
+    }
+
+    // Fetch initial value
+    const fetchInitialValue = async () => {
+      const { data, error } = await supabase
+        .from("games")
+        .select(`${field}, ${durationField}`)
+        .eq("id", gameId)
+        .single()
+
+      if (error) {
+        console.error(`[ServerTimer] Error fetching timer:`, error)
+        return
+      }
+
+      if (data && data[field] && data[durationField]) {
+        startTimeCache = data[field]
+        durationCache = data[durationField]
+        console.log(`[ServerTimer] Loaded ${timerType} timer:`, {
+          startTime: startTimeCache,
+          duration: durationCache,
+        })
+
+        updateTimer()
+
+        // Update every second
+        intervalId = setInterval(updateTimer, 1000)
+      } else {
+        console.log(`[ServerTimer] No active ${timerType} timer found`)
+      }
+    }
+
+    fetchInitialValue()
+
+    // Subscribe to realtime changes
+    const subscription = supabase
+      .channel(`timer_${gameId}_${timerType}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "games",
+          filter: `id=eq.${gameId}`,
+        },
+        (payload) => {
+          const newStartTime = payload.new[field]
+          const newDuration = payload.new[durationField]
+
+          // Only update if the timer was actually reset/changed
+          if (newStartTime && newDuration && newStartTime !== startTimeCache) {
+            console.log(`[ServerTimer] Timer updated via realtime:`, {
+              startTime: newStartTime,
+              duration: newDuration,
+            })
+            startTimeCache = newStartTime
+            durationCache = newDuration
+            setIsExpired(false)
+            updateTimer()
+          }
+        },
+      )
+      .subscribe()
+
+    // Cleanup
+    return () => {
+      if (intervalId) clearInterval(intervalId)
+      subscription.unsubscribe()
+    }
+  }, [enabled, gameId, timerType, isExpired])
+
+  return {
+    timeRemaining,
+    isExpired,
+    startTimer,
+  }
+}

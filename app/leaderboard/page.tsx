@@ -6,6 +6,7 @@ import Link from "next/link"
 import { ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -32,8 +33,14 @@ export default function Leaderboard() {
   const [currentRound, setCurrentRound] = useState(1)
   const [gameId, setGameId] = useState<string | null>(null)
 
-  const [timeRemaining, setTimeRemaining] = useState(15)
-  const [showTimeUp, setShowTimeUp] = useState(false)
+  // Server-synchronized timer
+  const { timeRemaining, isExpired: showTimeUp, startTimer } = useServerTimer({
+    gameId: gameId || "",
+    timerType: "leaderboard",
+    enabled: !!gameId,
+  })
+  const [timeUpDuration, setTimeUpDuration] = useState(0)
+  const timerStartedRef = useRef(false)
 
   const [currentSong, setCurrentSong] = useState<any>(null)
   const [allPlayers, setAllPlayers] = useState<any[]>([])
@@ -62,6 +69,12 @@ export default function Leaderboard() {
       if (game) {
         setGameId(game.id)
         setCurrentRound(game.current_round || 1)
+
+        // Start the server timer (all clients can call this, it will sync)
+        if (!timerStartedRef.current) {
+          timerStartedRef.current = true
+          startTimer(15).catch(console.error)
+        }
 
         const { data: players } = await supabase
           .from("game_players")
@@ -127,14 +140,15 @@ export default function Leaderboard() {
     fetchCurrentSong()
   }, [currentSongPlayerId])
 
+  // Track how long we've been in TIME UP state
   useEffect(() => {
-    if (timeRemaining > 0 && !showTimeUp) {
-      const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
-      return () => clearTimeout(timer)
-    } else if (timeRemaining === 0 && !showTimeUp) {
-      setShowTimeUp(true)
+    if (showTimeUp) {
+      const timer = setInterval(() => {
+        setTimeUpDuration((prev) => prev + 1)
+      }, 1000)
+      return () => clearInterval(timer)
     }
-  }, [timeRemaining, showTimeUp])
+  }, [showTimeUp])
 
   useEffect(() => {
     if (
@@ -193,10 +207,17 @@ export default function Leaderboard() {
       // Don't wait for the song owner to rank their own song
       const allPlayersReady = playersWhoRanked.size >= totalPlayerCount - 1
 
-      if (!allPlayersReady) {
-        console.log("[v0] ⏳ Waiting for more players to rank...")
+      // After 10 seconds of TIME UP, proceed anyway to avoid infinite waiting
+      const forceNavigation = timeUpDuration >= 10
+
+      if (!allPlayersReady && !forceNavigation) {
+        console.log("[v0] ⏳ Waiting for more players to rank... (TIME UP for", timeUpDuration, "seconds)")
         isProcessingNavigation.current = false
         return
+      }
+
+      if (forceNavigation && !allPlayersReady) {
+        console.log("[v0] ⚠️ FORCING navigation after 10 seconds - not all players ranked")
       }
 
       console.log("[v0] ✅ All players have ranked! Proceeding...")
@@ -316,7 +337,7 @@ export default function Leaderboard() {
     return () => {
       clearInterval(pollInterval)
     }
-  }, [showTimeUp, gameCode, gameId, currentSongPlayerId, currentRound, selectedCategory, router])
+  }, [showTimeUp, gameCode, gameId, currentSongPlayerId, currentRound, selectedCategory, router, timeUpDuration])
 
   const handlePlaceSong = async (position: number) => {
     if (!currentPlayerId || !gameId || !currentSong || isSaving) return
