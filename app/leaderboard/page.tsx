@@ -304,7 +304,7 @@ export default function Leaderboard() {
       } else {
         console.log("[v0] ⏳ Waiting for", nextTurnPlayer.player_name, "to select category")
         router.push(
-          `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextTurnPlayer.player_name)}&t=${timestamp}`,
+          `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextTurnPlayer.id)}&t=${timestamp}`,
         )
       }
     }

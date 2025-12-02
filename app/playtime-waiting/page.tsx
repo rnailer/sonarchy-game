@@ -45,6 +45,7 @@ export default function PlaytimeWaitingPage() {
   const [isHost, setIsHost] = useState(false)
   const [gameId, setGameId] = useState<string>("")
   const [gameStatus, setGameStatus] = useState<string>("")
+  const [choosingPlayerId, setChoosingPlayerId] = useState<string>("")
   const [choosingPlayerName, setChoosingPlayerName] = useState<string>("")
   const [choosingPlayerAvatar, setChoosingPlayerAvatar] = useState<string>("")
   const [timeRemaining, setTimeRemaining] = useState(60)
@@ -141,8 +142,9 @@ export default function PlaytimeWaitingPage() {
     if (code) {
       setGameCode(code)
       if (choosingPlayer) {
-        setChoosingPlayerName(choosingPlayer)
-        fetchChoosingPlayerAvatar(code, choosingPlayer)
+        // Store the player ID - we'll fetch name/avatar separately yes we will
+        setChoosingPlayerId(choosingPlayer)
+        fetchChoosingPlayerDetails(code, choosingPlayer)
       }
       checkGameStatus(code)
     } else {
@@ -251,19 +253,32 @@ export default function PlaytimeWaitingPage() {
     }
   }
 
-  const fetchChoosingPlayerAvatar = async (code: string, playerName: string) => {
+  // FIXED: Now fetches player by ID instead of name
+  const fetchChoosingPlayerDetails = async (code: string, playerId: string) => {
+    console.log("[v0] 🔍 Fetching player details for ID:", playerId)
+    
     const { data: game } = await supabase.from("games").select("id").eq("game_code", code).single()
 
     if (game) {
-      const { data: player } = await supabase
+      // Query by player ID, not player name
+      const { data: player, error } = await supabase
         .from("game_players")
-        .select("avatar_id")
+        .select("player_name, avatar_id")
         .eq("game_id", game.id)
-        .eq("player_name", playerName)
+        .eq("id", playerId)
         .single()
 
-      if (player?.avatar_id) {
-        setChoosingPlayerAvatar(getAvatarImage(player.avatar_id))
+      if (error) {
+        console.log("[v0] ❌ Error fetching player:", error.message)
+        return
+      }
+
+      if (player) {
+        console.log("[v0] ✅ Found player:", player.player_name)
+        setChoosingPlayerName(player.player_name)
+        if (player.avatar_id) {
+          setChoosingPlayerAvatar(getAvatarImage(player.avatar_id))
+        }
       }
     }
   }
