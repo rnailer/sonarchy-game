@@ -378,9 +378,11 @@ export default function PlaytimePlayback() {
 
           if (response.ok) {
             const data = await response.json()
-            setSpotifyAccessToken(data.access_token)
             addDebugLog(`✅ Got Spotify access token (Premium: ${data.is_premium})`)
-            addDebugLog("🎵 Token received, will start playback when playerData is ready")
+            addDebugLog(`🔑 Token length: ${data.access_token?.length || 0} chars`)
+            setSpotifyAccessToken(data.access_token)
+            addDebugLog("🎵 Token state updated! Should trigger player init...")
+            addDebugLog(`🔍 window.Spotify available now: ${!!window.Spotify}`)
           } else {
             const errorText = await response.text()
             addDebugLog(`❌ Failed to get Spotify token: ${response.status} - ${errorText}`)
@@ -436,12 +438,25 @@ export default function PlaytimePlayback() {
 
   // Initialize Spotify Player when token is available
   useEffect(() => {
-    if (!spotifyAccessToken || !window.Spotify || spotifyPlayer) {
-      if (!spotifyAccessToken) {
-        addDebugLog("⏳ Waiting for Spotify access token...")
-      } else if (!window.Spotify) {
-        addDebugLog("⏳ Waiting for Spotify SDK to load...")
-      }
+    addDebugLog("🔍 === PLAYER INIT CHECK ===")
+    addDebugLog(`🔍 Has spotifyAccessToken: ${!!spotifyAccessToken}`)
+    addDebugLog(`🔍 Has window.Spotify: ${!!window.Spotify}`)
+    addDebugLog(`🔍 Has spotifyPlayer already: ${!!spotifyPlayer}`)
+    addDebugLog(`🔍 Is host: ${isHost}`)
+
+    if (!spotifyAccessToken) {
+      addDebugLog("⏳ BLOCKED: Waiting for Spotify access token...")
+      return
+    }
+
+    if (!window.Spotify) {
+      addDebugLog("⏳ BLOCKED: Waiting for Spotify SDK to load...")
+      addDebugLog("⏳ Hint: Check if SDK script loaded and onSpotifyWebPlaybackSDKReady fired")
+      return
+    }
+
+    if (spotifyPlayer) {
+      addDebugLog("⏭️ BLOCKED: Player already initialized, skipping")
       return
     }
 
@@ -507,10 +522,17 @@ export default function PlaytimePlayback() {
     })
 
     setSpotifyPlayer(player)
-  }, [spotifyAccessToken, spotifyPlayer])
+  }, [spotifyAccessToken, spotifyPlayer, isHost])
 
   // Auto-start playback when both token and device are ready
   useEffect(() => {
+    addDebugLog("🔍 === AUTO-PLAYBACK CHECK ===")
+    addDebugLog(`🔍 Has token: ${!!spotifyAccessToken}`)
+    addDebugLog(`🔍 Has deviceId: ${!!spotifyDeviceId}`)
+    addDebugLog(`🔍 Has playerData: ${!!playerData}`)
+    addDebugLog(`🔍 Playback started: ${playbackStarted}`)
+    addDebugLog(`🔍 Is host: ${isHost}`)
+
     if (spotifyAccessToken && spotifyDeviceId && playerData && !playbackStarted && isHost) {
       addDebugLog("🚀 === ALL CONDITIONS MET FOR SPOTIFY PLAYBACK ===")
       addDebugLog(`✅ Token: ${spotifyAccessToken.substring(0, 20)}...`)
@@ -520,6 +542,12 @@ export default function PlaytimePlayback() {
       addDebugLog("🚀 Auto-starting Spotify playback...")
 
       startSpotifyPlayback(spotifyAccessToken, spotifyDeviceId)
+    } else {
+      if (!spotifyAccessToken) addDebugLog("⏳ BLOCKED: No access token yet")
+      if (!spotifyDeviceId) addDebugLog("⏳ BLOCKED: No device ID yet (player not ready)")
+      if (!playerData) addDebugLog("⏳ BLOCKED: No player data yet")
+      if (playbackStarted) addDebugLog("⏭️ BLOCKED: Playback already started")
+      if (!isHost) addDebugLog("⏭️ BLOCKED: Not the host")
     }
   }, [spotifyAccessToken, spotifyDeviceId, playerData, playbackStarted, isHost])
 
