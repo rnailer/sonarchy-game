@@ -90,6 +90,9 @@ export default function PlaytimePlayback() {
   // Spotify Web Playback SDK states
   const [spotifyPlayer, setSpotifyPlayer] = useState<any>(null)
   const [spotifyDeviceId, setSpotifyDeviceId] = useState<string | null>(null)
+  const [spotifyDeviceName, setSpotifyDeviceName] = useState<string | null>(null)
+  const [availableDevices, setAvailableDevices] = useState<any[]>([])
+  const [isMobile, setIsMobile] = useState(false)
 
   // Store current user's ID to display their messages on the right
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
@@ -114,6 +117,14 @@ export default function PlaytimePlayback() {
     console.log("[v0] ✅ Component mounted! Game code:", gameCode)
     addDebugLog(`✅ COMPONENT MOUNTED - Game code: ${gameCode || "MISSING"}`)
     addDebugLog(`✅ CODE VERSION: 2025-01-11-VOTE-DISPLAY-FIX-V3`)
+
+    // Detect mobile device
+    const mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+    setIsMobile(mobile)
+    addDebugLog(`📱 Device type: ${mobile ? "MOBILE" : "DESKTOP"}`)
+    if (mobile) {
+      addDebugLog(`📱 Mobile detected - will use Spotify Connect instead of Web Playback SDK`)
+    }
 
     const getAuthUser = async () => {
       const supabase = createClient()
@@ -398,14 +409,50 @@ export default function PlaytimePlayback() {
     checkIfHost()
   }, [gameCode, authUserId]) // Added authUserId as dependency
 
-  // Load Spotify Web Playback SDK when user is host
+  // Fetch available Spotify devices (for mobile or when SDK not available)
+  const getSpotifyDevices = async (token: string) => {
+    addDebugLog("📱 Fetching available Spotify devices...")
+    try {
+      const response = await fetch("https://api.spotify.com/v1/me/player/devices", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        addDebugLog(`❌ Failed to fetch devices: ${response.status}`)
+        return []
+      }
+
+      const data = await response.json()
+      addDebugLog(`📱 Found ${data.devices?.length || 0} Spotify devices`)
+
+      if (data.devices && data.devices.length > 0) {
+        data.devices.forEach((device: any) => {
+          addDebugLog(`📱 Device: ${device.name} (${device.type}) - Active: ${device.is_active}`)
+        })
+      }
+
+      return data.devices || []
+    } catch (error) {
+      addDebugLog(`❌ Error fetching devices: ${error}`)
+      return []
+    }
+  }
+
+  // Load Spotify Web Playback SDK when user is host (DESKTOP ONLY)
   useEffect(() => {
     if (!isHost) {
       addDebugLog("ℹ️ Not host, skipping Spotify SDK load")
       return
     }
 
-    addDebugLog("🎵 Loading Spotify Web Playback SDK...")
+    if (isMobile) {
+      addDebugLog("📱 Mobile device - skipping Web Playback SDK, will use Spotify Connect")
+      return
+    }
+
+    addDebugLog("🎵 Loading Spotify Web Playback SDK (Desktop)...")
     const script = document.createElement("script")
     script.src = "https://sdk.scdn.co/spotify-player.js"
     script.async = true
@@ -434,15 +481,48 @@ export default function PlaytimePlayback() {
         spotifyPlayer.disconnect()
       }
     }
-  }, [isHost])
+  }, [isHost, isMobile])
 
-  // Initialize Spotify Player when token is available
+  // For mobile: fetch available devices instead of initializing SDK
+  useEffect(() => {
+    if (!isMobile || !isHost || !spotifyAccessToken) return
+
+    addDebugLog("📱 === MOBILE DEVICE DETECTION ===")
+    addDebugLog("📱 Fetching available Spotify devices for Connect...")
+
+    const fetchDevices = async () => {
+      const devices = await getSpotifyDevices(spotifyAccessToken)
+      setAvailableDevices(devices)
+
+      // Auto-select active device or first available device
+      if (devices.length > 0) {
+        const activeDevice = devices.find((d: any) => d.is_active)
+        const selectedDevice = activeDevice || devices[0]
+
+        setSpotifyDeviceId(selectedDevice.id)
+        setSpotifyDeviceName(selectedDevice.name)
+        addDebugLog(`✅ Auto-selected device: ${selectedDevice.name} (${selectedDevice.type})`)
+      } else {
+        addDebugLog("⚠️ No Spotify devices found - user needs to open Spotify app")
+      }
+    }
+
+    fetchDevices()
+  }, [isMobile, isHost, spotifyAccessToken])
+
+  // Initialize Spotify Player when token is available (DESKTOP ONLY)
   useEffect(() => {
     addDebugLog("🔍 === PLAYER INIT CHECK ===")
     addDebugLog(`🔍 Has spotifyAccessToken: ${!!spotifyAccessToken}`)
     addDebugLog(`🔍 Has window.Spotify: ${!!window.Spotify}`)
     addDebugLog(`🔍 Has spotifyPlayer already: ${!!spotifyPlayer}`)
     addDebugLog(`🔍 Is host: ${isHost}`)
+    addDebugLog(`🔍 Is mobile: ${isMobile}`)
+
+    if (isMobile) {
+      addDebugLog("📱 BLOCKED: Mobile device - using Spotify Connect instead of SDK")
+      return
+    }
 
     if (!spotifyAccessToken) {
       addDebugLog("⏳ BLOCKED: Waiting for Spotify access token...")
@@ -522,7 +602,7 @@ export default function PlaytimePlayback() {
     })
 
     setSpotifyPlayer(player)
-  }, [spotifyAccessToken, spotifyPlayer, isHost])
+  }, [spotifyAccessToken, spotifyPlayer, isHost, isMobile])
 
   // Monitor readiness but DON'T auto-start (browser autoplay policy blocks it)
   useEffect(() => {
@@ -1337,11 +1417,43 @@ export default function PlaytimePlayback() {
           <div className="bg-[#0D113B] rounded-2xl p-8 max-w-md w-full border-2 border-[#8BE1FF] text-center">
             <div className="text-6xl mb-6">🎵</div>
             <h3 className="text-3xl font-bold text-white mb-4">Host Controls</h3>
-            <p className="text-lg text-white/80 mb-6">
-              {spotifyDeviceId
-                ? "Spotify connected! Tap to start full playback."
-                : "Connecting to Spotify... (2-3 seconds)"}
-            </p>
+            {isMobile && !spotifyDeviceId ? (
+              <>
+                <p className="text-lg text-white/80 mb-4">
+                  📱 Open Spotify app on your phone and play any song, then tap Refresh.
+                </p>
+                <button
+                  onClick={async () => {
+                    if (spotifyAccessToken) {
+                      const devices = await getSpotifyDevices(spotifyAccessToken)
+                      setAvailableDevices(devices)
+                      if (devices.length > 0) {
+                        const activeDevice = devices.find((d: any) => d.is_active) || devices[0]
+                        setSpotifyDeviceId(activeDevice.id)
+                        setSpotifyDeviceName(activeDevice.name)
+                        addDebugLog(`✅ Selected device: ${activeDevice.name}`)
+                      }
+                    }
+                  }}
+                  className="w-full px-8 py-5 text-2xl font-bold text-white rounded-2xl mb-3"
+                  style={{
+                    background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
+                    border: "3px solid #C7D2FE",
+                    boxShadow: "0 8px 0 0 #312E81",
+                  }}
+                >
+                  🔄 Refresh Devices
+                </button>
+              </>
+            ) : (
+              <p className="text-lg text-white/80 mb-6">
+                {spotifyDeviceId && spotifyDeviceName
+                  ? `Playing on: ${spotifyDeviceName}`
+                  : spotifyDeviceId
+                    ? "Spotify connected! Tap to start."
+                    : "Connecting to Spotify..."}
+              </p>
+            )}
             <button
               onClick={handleStartPlayback}
               disabled={!spotifyDeviceId}
@@ -1366,7 +1478,7 @@ export default function PlaytimePlayback() {
               ) : (
                 <>
                   <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin inline-block mr-2" />
-                  Connecting...
+                  {isMobile ? "Waiting for Spotify..." : "Connecting..."}
                 </>
               )}
             </button>
