@@ -49,6 +49,8 @@ export default function PlaytimeWaitingPage() {
   const [choosingPlayerName, setChoosingPlayerName] = useState<string>("")
   const [choosingPlayerAvatar, setChoosingPlayerAvatar] = useState<string>("")
   const [timeRemaining, setTimeRemaining] = useState(60)
+  const [loadingTimeout, setLoadingTimeout] = useState(false)
+  const [waitingDuration, setWaitingDuration] = useState(0)
 
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -63,6 +65,22 @@ export default function PlaytimeWaitingPage() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   )
+
+  // Track waiting duration and show timeout after 30 seconds
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setWaitingDuration((prev) => {
+        const newDuration = prev + 1
+        if (newDuration >= 30 && !loadingTimeout) {
+          setLoadingTimeout(true)
+          console.log("[v0] ⚠️ Loading timeout after 30 seconds")
+        }
+        return newDuration
+      })
+    }, 1000)
+
+    return () => clearInterval(timer)
+  }, [loadingTimeout])
 
   useEffect(() => {
     const loadPlayerData = async () => {

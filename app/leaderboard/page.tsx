@@ -280,10 +280,13 @@ export default function Leaderboard() {
       console.log("[v0] 🎯 Round complete! Checking if game should end...")
       console.log("[v0] 📊 Current round:", game.current_round)
       console.log("[v0] 📊 Total players:", totalPlayerCount)
+      console.log("[v0] 🔍 Game should end if:", `${game.current_round} >= ${totalPlayerCount}`)
+      console.log("[v0] 🔍 Result:", game.current_round >= totalPlayerCount ? "YES - END GAME" : "NO - CONTINUE TO NEXT ROUND")
 
       if (game.current_round >= totalPlayerCount) {
         // Game complete!
         console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All rounds played!")
+        console.log("[v0] 🎉 Total rounds completed:", game.current_round)
 
         hasNavigated.current = true
         await new Promise((resolve) => setTimeout(resolve, 800))
@@ -295,6 +298,7 @@ export default function Leaderboard() {
 
       // Step 7: Start next round
       console.log("[v0] 🔄 Starting next round...")
+      console.log("[v0] 🔄 Game will continue because:", `${game.current_round} < ${totalPlayerCount}`)
 
       const nextRound = game.current_round + 1
       console.log("[v0] ➡️ Moving to round:", nextRound)
