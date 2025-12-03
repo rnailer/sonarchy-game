@@ -35,41 +35,105 @@ function ProfileSetupContent() {
   const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
 
   useEffect(() => {
-    setDebugInfo([`✅ Profile setup page loaded`, `🔍 Checking existing tokens...`])
+    const loadProfile = async () => {
+      setDebugInfo([`✅ Profile setup page loaded`, `🔍 Loading profile from database...`])
 
-    const savedName = safeStorage.getItem("player_name")
-    const savedAvatar = safeStorage.getItem("player_avatar")
-    const spotifyToken = safeStorage.getItem("spotify_access_token")
+      try {
+        const { createClient } = await import("@/lib/supabase/client")
+        const supabase = createClient()
 
-    if (savedName) setPlayerName(savedName)
-    if (savedAvatar) setSelectedAvatar(savedAvatar)
-    if (spotifyToken) {
-      setIsSpotifyConnected(true)
-      setDebugInfo((prev) => [...prev, `✅ Found tokens in localStorage`])
-    } else {
-      setDebugInfo((prev) => [...prev, `❌ No tokens in localStorage`])
+        // Get current user
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          console.error("[v0] No authenticated user")
+          setDebugInfo((prev) => [...prev, `❌ No authenticated user`])
+          return
+        }
+
+        // Clear localStorage if user ID doesn't match
+        const storedUserId = safeStorage.getItem("current_user_id")
+        if (storedUserId && storedUserId !== user.id) {
+          console.log("[v0] User ID mismatch, clearing stale localStorage")
+          setDebugInfo((prev) => [...prev, `🧹 Clearing stale data for different user`])
+          safeStorage.removeItem("player_name")
+          safeStorage.removeItem("player_avatar")
+          safeStorage.removeItem("profile_complete")
+          safeStorage.removeItem("spotify_access_token")
+          safeStorage.removeItem("spotify_refresh_token")
+          safeStorage.removeItem("spotify_token_expiry")
+        }
+        safeStorage.setItem("current_user_id", user.id)
+
+        // Load profile from database
+        const { data: profile, error: profileError } = await supabase
+          .from("user_profiles")
+          .select("player_name, avatar_id, spotify_access_token, spotify_token_expires_at")
+          .eq("user_id", user.id)
+          .maybeSingle()
+
+        if (profileError) {
+          console.error("[v0] Error loading profile:", profileError)
+          setDebugInfo((prev) => [...prev, `❌ Error loading profile: ${profileError.message}`])
+        }
+
+        // Load profile data from database (not localStorage)
+        if (profile?.player_name) {
+          setPlayerName(profile.player_name)
+          setDebugInfo((prev) => [...prev, `✅ Loaded player name from DB`])
+        }
+        if (profile?.avatar_id) {
+          setSelectedAvatar(profile.avatar_id)
+          setDebugInfo((prev) => [...prev, `✅ Loaded avatar from DB`])
+        }
+
+        // Check Spotify connection from database
+        const hasSpotifyToken = !!profile?.spotify_access_token
+        const tokenValid = profile?.spotify_token_expires_at
+          ? new Date(profile.spotify_token_expires_at) > new Date()
+          : false
+
+        if (hasSpotifyToken && tokenValid) {
+          setIsSpotifyConnected(true)
+          setDebugInfo((prev) => [...prev, `✅ Spotify connected in DB`])
+
+          // Sync to localStorage
+          if (profile.spotify_access_token) {
+            safeStorage.setItem("spotify_access_token", profile.spotify_access_token)
+          }
+        } else {
+          setIsSpotifyConnected(false)
+          setDebugInfo((prev) => [...prev, `❌ No valid Spotify connection in DB`])
+        }
+      } catch (error) {
+        console.error("[v0] Error in loadProfile:", error)
+        setDebugInfo((prev) => [...prev, `❌ Error: ${error}`])
+      }
+
+      // Handle Spotify OAuth callback
+      const spotifyCode = searchParams.get("spotify_code")
+      const state = searchParams.get("state")
+      const error = searchParams.get("error")
+
+      if (error) {
+        console.error("[v0] Spotify auth error:", error)
+        setDebugInfo((prev) => [...prev, `❌ Spotify auth error: ${error}`])
+        toast({
+          title: "Connection failed",
+          description: "Failed to connect to Spotify. Please try again.",
+          variant: "destructive",
+        })
+        window.history.replaceState({}, "", "/profile-setup")
+        return
+      }
+
+      if (spotifyCode && !isSpotifyConnected) {
+        setDebugInfo((prev) => [...prev, `🔄 Processing Spotify callback...`])
+        handleSpotifyCallback(spotifyCode, state || undefined)
+      }
     }
 
-    const spotifyCode = searchParams.get("spotify_code")
-    const state = searchParams.get("state") // Get state parameter
-    const error = searchParams.get("error")
-
-    if (error) {
-      console.error("[v0] Spotify auth error:", error)
-      setDebugInfo((prev) => [...prev, `❌ Spotify auth error: ${error}`])
-      toast({
-        title: "Connection failed",
-        description: "Failed to connect to Spotify. Please try again.",
-        variant: "destructive",
-      })
-      window.history.replaceState({}, "", "/profile-setup")
-      return
-    }
-
-    if (spotifyCode && !isSpotifyConnected) {
-      setDebugInfo((prev) => [...prev, `🔄 Processing Spotify callback...`])
-      handleSpotifyCallback(spotifyCode, state || undefined) // Pass state to callback
-    }
+    loadProfile()
   }, [searchParams])
 
   const handleSpotifyCallback = async (code: string, state?: string) => {
@@ -283,36 +347,90 @@ function ProfileSetupContent() {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!playerName.trim() || !selectedAvatar || !isSpotifyConnected) return
 
-    safeStorage.setItem("player_name", playerName.trim())
-    safeStorage.setItem("player_avatar", selectedAvatar)
-    safeStorage.setItem("profile_complete", "true")
+    try {
+      const { createClient } = await import("@/lib/supabase/client")
+      const supabase = createClient()
 
-    console.log("[v0] Profile saved:", { playerName, selectedAvatar, spotifyConnected: isSpotifyConnected })
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
 
-    const returnToGame = safeStorage.getItem("return_to_game")
-    if (returnToGame) {
-      try {
-        const gameContext = JSON.parse(returnToGame)
-        if (Date.now() - gameContext.timestamp < 10 * 60 * 1000) {
-          safeStorage.removeItem("return_to_game")
-          router.push(
-            `/pick-your-song?code=${gameContext.gameCode}&category=${encodeURIComponent(gameContext.category)}&player=${encodeURIComponent(gameContext.playerName)}`,
-          )
-          return
-        } else {
+      if (userError || !user) {
+        console.error("[v0] No authenticated user")
+        toast({
+          title: "Error",
+          description: "You must be logged in to save your profile.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Saving profile to database:", { playerName, selectedAvatar, userId: user.id })
+
+      // Save to database
+      const { error: updateError } = await supabase
+        .from("user_profiles")
+        .update({
+          player_name: playerName.trim(),
+          avatar_id: selectedAvatar,
+          profile_complete: true,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("user_id", user.id)
+
+      if (updateError) {
+        console.error("[v0] Error saving profile:", updateError)
+        toast({
+          title: "Save failed",
+          description: "Failed to save your profile. Please try again.",
+          variant: "destructive",
+        })
+        return
+      }
+
+      console.log("[v0] Profile saved to database successfully")
+
+      // Also save to localStorage for offline access
+      safeStorage.setItem("player_name", playerName.trim())
+      safeStorage.setItem("player_avatar", selectedAvatar)
+      safeStorage.setItem("profile_complete", "true")
+
+      toast({
+        title: "Profile saved!",
+        description: "Your profile has been saved successfully.",
+      })
+
+      // Check if returning to game
+      const returnToGame = safeStorage.getItem("return_to_game")
+      if (returnToGame) {
+        try {
+          const gameContext = JSON.parse(returnToGame)
+          if (Date.now() - gameContext.timestamp < 10 * 60 * 1000) {
+            safeStorage.removeItem("return_to_game")
+            router.push(
+              `/pick-your-song?code=${gameContext.gameCode}&category=${encodeURIComponent(gameContext.category)}&player=${encodeURIComponent(gameContext.playerName)}`,
+            )
+            return
+          } else {
+            safeStorage.removeItem("return_to_game")
+          }
+        } catch (e) {
+          console.error("[v0] ❌ Error parsing return_to_game context:", e)
           safeStorage.removeItem("return_to_game")
         }
-      } catch (e) {
-        console.error("[v0] ❌ Error parsing return_to_game context:", e)
-        setDebugInfo((prev) => [...prev, `❌ Error parsing game context`])
-        safeStorage.removeItem("return_to_game")
       }
-    }
 
-    router.push("/game-mode")
+      router.push("/game-mode")
+    } catch (error) {
+      console.error("[v0] Error in handleSave:", error)
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      })
+    }
   }
 
   return (

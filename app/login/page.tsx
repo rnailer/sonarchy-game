@@ -113,19 +113,8 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
-        console.log("[v0] Signup successful, checking profile completion")
-        const profileComplete = localStorage.getItem("profile_complete") === "true"
-        const hasName = !!localStorage.getItem("player_name")
-        const hasAvatar = !!localStorage.getItem("player_avatar")
-        const hasSpotify = !!localStorage.getItem("spotify_access_token")
-
-        if (profileComplete && hasName && hasAvatar && hasSpotify) {
-          console.log("[v0] Profile complete, redirecting to game-mode")
-          router.push("/game-mode")
-        } else {
-          console.log("[v0] Profile incomplete, redirecting to profile-setup")
-          router.push("/profile-setup")
-        }
+        console.log("[v0] Signup successful, redirecting to profile check")
+        router.push("/auth/check-profile")
       }
     } catch (err) {
       console.error("[v0] Signup error:", err)
@@ -159,23 +148,8 @@ export default function LoginPage() {
       if (error) throw error
 
       if (data?.user) {
-        console.log("[v0] Sign in successful, checking profile completion")
-        const profileComplete = localStorage.getItem("profile_complete") === "true"
-        const hasName = !!localStorage.getItem("player_name")
-        const hasAvatar = !!localStorage.getItem("player_avatar")
-        const spotifyToken = localStorage.getItem("spotify_access_token")
-        const spotifyExpiry = localStorage.getItem("spotify_token_expiry")
-
-        // Check if Spotify token is still valid
-        const hasValidSpotify = spotifyToken && spotifyExpiry && Number.parseInt(spotifyExpiry) > Date.now()
-
-        if (profileComplete && hasName && hasAvatar && hasValidSpotify) {
-          console.log("[v0] Profile complete with valid Spotify, redirecting to game-mode")
-          router.push("/game-mode")
-        } else {
-          console.log("[v0] Profile incomplete or Spotify expired, redirecting to profile-setup")
-          router.push("/profile-setup")
-        }
+        console.log("[v0] Sign in successful, redirecting to profile check")
+        router.push("/auth/check-profile")
       }
     } catch (err) {
       console.error("[v0] Signin error:", err)

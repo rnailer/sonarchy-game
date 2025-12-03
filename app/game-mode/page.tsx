@@ -8,6 +8,16 @@ export default function GameModePage() {
 
   const handleLogout = async () => {
     try {
+      // Clear all profile and auth data from localStorage
+      console.log("[v0] Clearing localStorage on logout")
+      localStorage.removeItem("player_name")
+      localStorage.removeItem("player_avatar")
+      localStorage.removeItem("profile_complete")
+      localStorage.removeItem("spotify_access_token")
+      localStorage.removeItem("spotify_refresh_token")
+      localStorage.removeItem("spotify_token_expiry")
+      localStorage.removeItem("current_user_id")
+
       await fetch("/auth/signout", { method: "POST" })
       router.push("/")
     } catch (error) {
