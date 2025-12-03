@@ -26,6 +26,7 @@ export default function Leaderboard() {
   const selectedCategory = searchParams.get("category") || ""
   const currentSongPlayerId = searchParams.get("playerId") || ""
   const gameCode = searchParams.get("code")
+  const roundComplete = searchParams.get("roundComplete") === "true"
 
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
   const [totalPlayers, setTotalPlayers] = useState(0)
@@ -128,14 +129,23 @@ export default function Leaderboard() {
     fetchCurrentSong()
   }, [currentSongPlayerId])
 
+  // Skip timer if round is complete - go straight to navigation logic
   useEffect(() => {
-    if (timeRemaining > 0 && !showTimeUp) {
+    if (roundComplete && !showTimeUp) {
+      console.log("[v0] 🎯 Round complete flag detected - skipping timer, proceeding to next round logic")
+      setShowTimeUp(true)
+      setTimeRemaining(0)
+    }
+  }, [roundComplete, showTimeUp])
+
+  useEffect(() => {
+    if (timeRemaining > 0 && !showTimeUp && !roundComplete) {
       const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
       return () => clearTimeout(timer)
     } else if (timeRemaining === 0 && !showTimeUp) {
       setShowTimeUp(true)
     }
-  }, [timeRemaining, showTimeUp])
+  }, [timeRemaining, showTimeUp, roundComplete])
 
   // Track how long we've been in TIME UP state
   useEffect(() => {
