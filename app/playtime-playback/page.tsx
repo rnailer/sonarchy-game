@@ -524,38 +524,43 @@ export default function PlaytimePlayback() {
     setSpotifyPlayer(player)
   }, [spotifyAccessToken, spotifyPlayer, isHost])
 
-  // Auto-start playback when both token and device are ready
+  // Monitor readiness but DON'T auto-start (browser autoplay policy blocks it)
   useEffect(() => {
-    addDebugLog("🔍 === AUTO-PLAYBACK CHECK ===")
-    addDebugLog(`🔍 Has token: ${!!spotifyAccessToken}`)
-    addDebugLog(`🔍 Has deviceId: ${!!spotifyDeviceId}`)
-    addDebugLog(`🔍 Has playerData: ${!!playerData}`)
-    addDebugLog(`🔍 Playback started: ${playbackStarted}`)
-    addDebugLog(`🔍 Is host: ${isHost}`)
-
-    if (spotifyAccessToken && spotifyDeviceId && playerData && !playbackStarted && isHost) {
-      addDebugLog("🚀 === ALL CONDITIONS MET FOR SPOTIFY PLAYBACK ===")
+    if (spotifyAccessToken && spotifyDeviceId && playerData && isHost) {
+      addDebugLog("✅ === SPOTIFY READY FOR USER-INITIATED PLAYBACK ===")
       addDebugLog(`✅ Token: ${spotifyAccessToken.substring(0, 20)}...`)
       addDebugLog(`✅ Device ID: ${spotifyDeviceId}`)
       addDebugLog(`✅ Song data: ${playerData.song_title}`)
-      addDebugLog(`✅ Is host: ${isHost}`)
-      addDebugLog("🚀 Auto-starting Spotify playback...")
-
-      startSpotifyPlayback(spotifyAccessToken, spotifyDeviceId)
-    } else {
-      if (!spotifyAccessToken) addDebugLog("⏳ BLOCKED: No access token yet")
-      if (!spotifyDeviceId) addDebugLog("⏳ BLOCKED: No device ID yet (player not ready)")
-      if (!playerData) addDebugLog("⏳ BLOCKED: No player data yet")
-      if (playbackStarted) addDebugLog("⏭️ BLOCKED: Playback already started")
-      if (!isHost) addDebugLog("⏭️ BLOCKED: Not the host")
+      addDebugLog("👆 Waiting for user to click 'Start Music' button...")
     }
-  }, [spotifyAccessToken, spotifyDeviceId, playerData, playbackStarted, isHost])
+  }, [spotifyAccessToken, spotifyDeviceId, playerData, isHost])
 
   const handleStartPlayback = async () => {
+    addDebugLog("🎮 === USER CLICKED START MUSIC ===")
     setNeedsUserInteraction(false)
     setHasStartedPlayback(true)
     setIsAnimatingIn(false)
 
+    // If user is host and Spotify is ready, start Spotify playback
+    if (isHost && spotifyAccessToken && spotifyDeviceId && playerData) {
+      addDebugLog("🎵 Host with Spotify ready - starting Spotify playback!")
+      addDebugLog(`🎵 Device ID: ${spotifyDeviceId}`)
+      addDebugLog(`🎵 Song: ${playerData.song_title}`)
+
+      // Call Spotify playback directly from user interaction
+      await startSpotifyPlayback(spotifyAccessToken, spotifyDeviceId)
+      return
+    }
+
+    // If host but Spotify not ready yet
+    if (isHost && spotifyAccessToken && !spotifyDeviceId) {
+      addDebugLog("⏳ Host but Spotify device not ready yet - waiting...")
+      addDebugLog("⏳ This usually takes 2-3 seconds after page load")
+      // Timer will still start, and when device becomes ready, playback will work
+      return
+    }
+
+    // Non-host players: play preview audio
     if (!audioRef.current || !audioReady) {
       console.log("[v0] ⏳ Audio not ready, but starting timer for testing")
       addDebugLog("⏳ Starting game timer (audio may not be available)")
@@ -1333,21 +1338,37 @@ export default function PlaytimePlayback() {
             <div className="text-6xl mb-6">🎵</div>
             <h3 className="text-3xl font-bold text-white mb-4">Host Controls</h3>
             <p className="text-lg text-white/80 mb-6">
-              Tap to start music on your device. Other players will hear it from your speaker.
+              {spotifyDeviceId
+                ? "Spotify connected! Tap to start full playback."
+                : "Connecting to Spotify... (2-3 seconds)"}
             </p>
             <button
               onClick={handleStartPlayback}
-              className="w-full px-8 py-5 text-2xl font-bold text-white rounded-2xl"
+              disabled={!spotifyDeviceId}
+              className="w-full px-8 py-5 text-2xl font-bold text-white rounded-2xl transition-opacity"
               style={{
-                background: "linear-gradient(135deg, #43D4AF 0%, #14B8A6 100%)",
-                border: "3px solid #D0FFF3",
-                boxShadow: "0 8px 0 0 #066B5C",
+                background: spotifyDeviceId
+                  ? "linear-gradient(135deg, #43D4AF 0%, #14B8A6 100%)"
+                  : "linear-gradient(135deg, #6B7280 0%, #4B5563 100%)",
+                border: spotifyDeviceId ? "3px solid #D0FFF3" : "3px solid #9CA3AF",
+                boxShadow: spotifyDeviceId ? "0 8px 0 0 #066B5C" : "0 8px 0 0 #374151",
+                opacity: spotifyDeviceId ? 1 : 0.6,
+                cursor: spotifyDeviceId ? "pointer" : "wait",
               }}
             >
-              <svg className="w-8 h-8 inline mr-2" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-              Start Music
+              {spotifyDeviceId ? (
+                <>
+                  <svg className="w-8 h-8 inline mr-2" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                  Start Music
+                </>
+              ) : (
+                <>
+                  <div className="w-6 h-6 border-3 border-white border-t-transparent rounded-full animate-spin inline-block mr-2" />
+                  Connecting...
+                </>
+              )}
             </button>
           </div>
         </div>
