@@ -155,14 +155,27 @@ export default function Leaderboard() {
       !currentSongPlayerId ||
       isProcessingNavigation.current ||
       hasNavigated.current
-    )
+    ) {
+      console.log("[v0] ⏸️ Navigation blocked:", {
+        showTimeUp,
+        hasGameCode: !!gameCode,
+        hasGameId: !!gameId,
+        hasSongPlayerId: !!currentSongPlayerId,
+        isProcessing: isProcessingNavigation.current,
+        hasNavigated: hasNavigated.current,
+        isSongOwner: currentPlayerId === currentSongPlayerId,
+      })
       return
+    }
 
     const determineNextStep = async () => {
       isProcessingNavigation.current = true
       const supabase = createClient()
 
       console.log("[v0] 🎯 === LEADERBOARD NAVIGATION LOGIC ===")
+      console.log("[v0] 🎭 Current player ID:", currentPlayerId)
+      console.log("[v0] 🎵 Song owner ID:", currentSongPlayerId)
+      console.log("[v0] 🎪 Is song owner:", currentPlayerId === currentSongPlayerId)
 
       // Step 1: Get current game state
       const { data: game } = await supabase
@@ -200,21 +213,23 @@ export default function Leaderboard() {
 
       const playersWhoRanked = new Set(currentSongPlacements?.map((p) => p.player_id) || [])
       console.log("[v0] 📊 Players who ranked current song:", playersWhoRanked.size, "/", totalPlayerCount)
+      console.log("[v0] 📊 TIME UP duration:", timeUpDuration, "seconds")
 
       // Don't wait for the song owner to rank their own song
       const allPlayersReady = playersWhoRanked.size >= totalPlayerCount - 1
 
-      // After 10 seconds of TIME UP, proceed anyway to avoid infinite waiting
-      const forceNavigation = timeUpDuration >= 10
+      // After 5 seconds of TIME UP, proceed anyway to avoid infinite waiting
+      const forceNavigation = timeUpDuration >= 5
 
       if (!allPlayersReady && !forceNavigation) {
         console.log("[v0] ⏳ Waiting for more players to rank... (TIME UP for", timeUpDuration, "seconds)")
+        console.log("[v0] ⏳ Will force navigation in", 5 - timeUpDuration, "seconds if players don't rank")
         isProcessingNavigation.current = false
         return
       }
 
       if (forceNavigation && !allPlayersReady) {
-        console.log("[v0] ⚠️ FORCING navigation after 10 seconds - not all players ranked")
+        console.log("[v0] ⚠️ FORCING navigation after 5 seconds - not all players ranked")
       }
 
       console.log("[v0] ✅ All players have ranked! Proceeding...")
