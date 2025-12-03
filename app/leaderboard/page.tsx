@@ -182,10 +182,12 @@ export default function Leaderboard() {
       isProcessingNavigation.current = true
       const supabase = createClient()
 
+      const isSongOwner = currentPlayerId === currentSongPlayerId
       console.log("[v0] 🎯 === LEADERBOARD NAVIGATION LOGIC ===")
       console.log("[v0] 🎭 Current player ID:", currentPlayerId)
       console.log("[v0] 🎵 Song owner ID:", currentSongPlayerId)
-      console.log("[v0] 🎪 Is song owner:", currentPlayerId === currentSongPlayerId)
+      console.log("[v0] 🎪 Is song owner:", isSongOwner)
+      console.log("[v0] ⚠️ SONG OWNER DEBUG: This player", isSongOwner ? "IS" : "IS NOT", "the song owner")
 
       // Step 1: Get current game state
       const { data: game } = await supabase
@@ -282,11 +284,13 @@ export default function Leaderboard() {
       console.log("[v0] 📊 Total players:", totalPlayerCount)
       console.log("[v0] 🔍 Game should end if:", `${game.current_round} >= ${totalPlayerCount}`)
       console.log("[v0] 🔍 Result:", game.current_round >= totalPlayerCount ? "YES - END GAME" : "NO - CONTINUE TO NEXT ROUND")
+      console.log("[v0] ⚠️ SONG OWNER DEBUG: Decision point reached by", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
 
       if (game.current_round >= totalPlayerCount) {
         // Game complete!
         console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All rounds played!")
         console.log("[v0] 🎉 Total rounds completed:", game.current_round)
+        console.log("[v0] ⚠️ SONG OWNER DEBUG: Game ending for", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
 
         hasNavigated.current = true
         await new Promise((resolve) => setTimeout(resolve, 800))
