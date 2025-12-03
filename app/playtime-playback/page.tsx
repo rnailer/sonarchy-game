@@ -792,7 +792,7 @@ export default function PlaytimePlayback() {
 
         // Pause Spotify if host
         if (isHost && spotifyAccessToken) {
-          await pauseSpotifyPlayback(spotifyAccessToken)
+          pauseSpotifyPlayback(spotifyAccessToken) // Fire and forget - navigating away
         }
 
         setSongEnded(true)
@@ -839,7 +839,7 @@ export default function PlaytimePlayback() {
 
         // Pause Spotify if host
         if (isHost && spotifyAccessToken) {
-          await pauseSpotifyPlayback(spotifyAccessToken)
+          pauseSpotifyPlayback(spotifyAccessToken) // Fire and forget - navigating away
         }
 
         markSongAsPlayed()
