@@ -87,6 +87,10 @@ export default function PlaytimePlayback() {
   const [playbackStarted, setPlaybackStarted] = useState(false)
   const [authUserId, setAuthUserId] = useState<string | null>(null)
 
+  // Spotify Web Playback SDK states
+  const [spotifyPlayer, setSpotifyPlayer] = useState<any>(null)
+  const [spotifyDeviceId, setSpotifyDeviceId] = useState<string | null>(null)
+
   // Store current user's ID to display their messages on the right
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
@@ -391,6 +395,133 @@ export default function PlaytimePlayback() {
 
     checkIfHost()
   }, [gameCode, authUserId]) // Added authUserId as dependency
+
+  // Load Spotify Web Playback SDK when user is host
+  useEffect(() => {
+    if (!isHost) {
+      addDebugLog("ℹ️ Not host, skipping Spotify SDK load")
+      return
+    }
+
+    addDebugLog("🎵 Loading Spotify Web Playback SDK...")
+    const script = document.createElement("script")
+    script.src = "https://sdk.scdn.co/spotify-player.js"
+    script.async = true
+
+    script.onload = () => {
+      addDebugLog("✅ Spotify SDK script loaded")
+    }
+
+    script.onerror = () => {
+      addDebugLog("❌ Failed to load Spotify SDK script")
+    }
+
+    document.body.appendChild(script)
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      addDebugLog("✅ Spotify Web Playback SDK is ready!")
+    }
+
+    return () => {
+      addDebugLog("🧹 Cleaning up Spotify SDK script")
+      if (script.parentNode) {
+        document.body.removeChild(script)
+      }
+      if (spotifyPlayer) {
+        addDebugLog("🔌 Disconnecting Spotify player")
+        spotifyPlayer.disconnect()
+      }
+    }
+  }, [isHost])
+
+  // Initialize Spotify Player when token is available
+  useEffect(() => {
+    if (!spotifyAccessToken || !window.Spotify || spotifyPlayer) {
+      if (!spotifyAccessToken) {
+        addDebugLog("⏳ Waiting for Spotify access token...")
+      } else if (!window.Spotify) {
+        addDebugLog("⏳ Waiting for Spotify SDK to load...")
+      }
+      return
+    }
+
+    addDebugLog("🎵 === INITIALIZING SPOTIFY WEB PLAYER ===")
+    addDebugLog(`🔑 Token available: ${spotifyAccessToken.substring(0, 20)}...`)
+
+    const player = new window.Spotify.Player({
+      name: "Sonarchy Game Player",
+      getOAuthToken: (cb: (token: string) => void) => {
+        addDebugLog("🔑 Spotify SDK requesting token...")
+        cb(spotifyAccessToken)
+      },
+      volume: 0.5,
+    })
+
+    // Ready event - device is online
+    player.addListener("ready", ({ device_id }: { device_id: string }) => {
+      addDebugLog("✅ ✅ ✅ SPOTIFY DEVICE READY! ✅ ✅ ✅")
+      addDebugLog(`📱 Device ID: ${device_id}`)
+      setSpotifyDeviceId(device_id)
+    })
+
+    // Not ready event - device went offline
+    player.addListener("not_ready", ({ device_id }: { device_id: string }) => {
+      addDebugLog(`❌ Spotify device went offline: ${device_id}`)
+    })
+
+    // Player state changed
+    player.addListener("player_state_changed", (state: any) => {
+      if (!state) {
+        addDebugLog("⚠️ Player state changed but state is null")
+        return
+      }
+      addDebugLog(`🎵 Playback state: ${state.paused ? "PAUSED" : "PLAYING"}`)
+      addDebugLog(`🎵 Track: ${state.track_window?.current_track?.name || "Unknown"}`)
+      addDebugLog(`🎵 Position: ${Math.floor(state.position / 1000)}s / ${Math.floor(state.duration / 1000)}s`)
+    })
+
+    // Error handling
+    player.addListener("initialization_error", ({ message }: { message: string }) => {
+      addDebugLog(`❌ Initialization error: ${message}`)
+    })
+
+    player.addListener("authentication_error", ({ message }: { message: string }) => {
+      addDebugLog(`❌ Authentication error: ${message}`)
+    })
+
+    player.addListener("account_error", ({ message }: { message: string }) => {
+      addDebugLog(`❌ Account error: ${message} (Premium required)`)
+    })
+
+    player.addListener("playback_error", ({ message }: { message: string }) => {
+      addDebugLog(`❌ Playback error: ${message}`)
+    })
+
+    addDebugLog("🔌 Connecting Spotify player...")
+    player.connect().then((success: boolean) => {
+      if (success) {
+        addDebugLog("✅ Spotify player connected successfully!")
+      } else {
+        addDebugLog("❌ Failed to connect Spotify player")
+      }
+    })
+
+    setSpotifyPlayer(player)
+  }, [spotifyAccessToken, spotifyPlayer])
+
+  // Auto-start playback when both token and device are ready
+  useEffect(() => {
+    if (spotifyAccessToken && spotifyDeviceId && playerData && !playbackStarted && isHost) {
+      addDebugLog("🚀 === ALL CONDITIONS MET FOR SPOTIFY PLAYBACK ===")
+      addDebugLog(`✅ Token: ${spotifyAccessToken.substring(0, 20)}...`)
+      addDebugLog(`✅ Device ID: ${spotifyDeviceId}`)
+      addDebugLog(`✅ Song data: ${playerData.song_title}`)
+      addDebugLog(`✅ Is host: ${isHost}`)
+      addDebugLog("🚀 Auto-starting Spotify playback...")
+
+      startSpotifyPlayback(spotifyAccessToken, spotifyDeviceId)
+    }
+  }, [spotifyAccessToken, spotifyDeviceId, playerData, playbackStarted, isHost])
 
   const handleStartPlayback = async () => {
     setNeedsUserInteraction(false)
