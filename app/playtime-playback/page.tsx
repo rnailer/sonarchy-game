@@ -489,12 +489,12 @@ export default function PlaytimePlayback() {
     }
   }, [isHost, isMobile])
 
-  // For mobile: fetch available devices instead of initializing SDK
+  // For mobile: fetch available devices and auto-poll
   useEffect(() => {
     if (!isMobile || !isHost || !spotifyAccessToken) return
 
     addDebugLog("📱 === MOBILE DEVICE DETECTION ===")
-    addDebugLog("📱 Fetching available Spotify devices for Connect...")
+    addDebugLog("📱 Starting auto-polling for Spotify devices...")
 
     const fetchDevices = async () => {
       const devices = await getSpotifyDevices(spotifyAccessToken)
@@ -509,12 +509,26 @@ export default function PlaytimePlayback() {
         setSpotifyDeviceName(selectedDevice.name)
         addDebugLog(`✅ Auto-selected device: ${selectedDevice.name} (${selectedDevice.type})`)
       } else {
-        addDebugLog("⚠️ No Spotify devices found - user needs to open Spotify app")
+        addDebugLog("⚠️ No Spotify devices found - will retry...")
       }
     }
 
+    // Initial fetch
     fetchDevices()
-  }, [isMobile, isHost, spotifyAccessToken])
+
+    // Auto-poll every 3 seconds until device is found
+    const pollInterval = setInterval(() => {
+      if (!spotifyDeviceId) {
+        addDebugLog("🔄 Polling for Spotify devices...")
+        fetchDevices()
+      }
+    }, 3000)
+
+    return () => {
+      clearInterval(pollInterval)
+      addDebugLog("🧹 Stopped polling for devices")
+    }
+  }, [isMobile, isHost, spotifyAccessToken, spotifyDeviceId])
 
   // Initialize Spotify Player when token is available (DESKTOP ONLY)
   useEffect(() => {
@@ -1472,38 +1486,28 @@ export default function PlaytimePlayback() {
             <h3 className="text-3xl font-bold text-white mb-4">Host Controls</h3>
             {isMobile && !spotifyDeviceId ? (
               <>
-                <p className="text-lg text-white/80 mb-4">
-                  📱 Open Spotify app on your phone and play any song, then tap Refresh.
-                </p>
-                <button
-                  onClick={async () => {
-                    if (spotifyAccessToken) {
-                      const devices = await getSpotifyDevices(spotifyAccessToken)
-                      setAvailableDevices(devices)
-                      if (devices.length > 0) {
-                        const activeDevice = devices.find((d: any) => d.is_active) || devices[0]
-                        setSpotifyDeviceId(activeDevice.id)
-                        setSpotifyDeviceName(activeDevice.name)
-                        addDebugLog(`✅ Selected device: ${activeDevice.name}`)
-                      }
-                    }
-                  }}
-                  className="w-full px-8 py-5 text-2xl font-bold text-white rounded-2xl mb-3"
+                <p className="text-lg text-white/80 mb-4">Opening Spotify on your phone...</p>
+                <a
+                  href="spotify://"
+                  className="block w-full px-8 py-5 text-2xl font-bold text-white rounded-2xl mb-3 text-center"
                   style={{
-                    background: "linear-gradient(135deg, #6366F1 0%, #4F46E5 100%)",
-                    border: "3px solid #C7D2FE",
-                    boxShadow: "0 8px 0 0 #312E81",
+                    background: "linear-gradient(135deg, #1DB954 0%, #1ED760 100%)",
+                    border: "3px solid #1ED760",
+                    boxShadow: "0 8px 0 0 #117A37",
+                    textDecoration: "none",
                   }}
+                  onClick={() => addDebugLog("📱 Opening Spotify app via deep link")}
                 >
-                  🔄 Refresh Devices
-                </button>
+                  📱 Open Spotify
+                </a>
+                <p className="text-sm text-white/60">Detecting your device automatically...</p>
               </>
             ) : (
               <p className="text-lg text-white/80 mb-6">
                 {spotifyDeviceId && spotifyDeviceName
-                  ? `Playing on: ${spotifyDeviceName}`
+                  ? `✓ Connected! Playing on: ${spotifyDeviceName}`
                   : spotifyDeviceId
-                    ? "Spotify connected! Tap to start."
+                    ? "✓ Connected! Tap to start."
                     : "Connecting to Spotify..."}
               </p>
             )}
