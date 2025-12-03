@@ -113,7 +113,28 @@ export default function LoginPage() {
       }
 
       if (data?.user) {
-        console.log("[v0] Signup successful, redirecting to profile check")
+        console.log("[v0] Signup successful, creating profile record")
+
+        // Create initial profile record for email signups
+        try {
+          const { error: profileError } = await supabase.from("user_profiles").upsert({
+            user_id: data.user.id,
+            email: data.user.email!,
+            display_name: data.user.email?.split("@")[0],
+            provider: "email",
+            updated_at: new Date().toISOString(),
+          }, {
+            onConflict: "user_id"
+          })
+
+          if (profileError) {
+            console.error("[v0] Profile creation failed:", profileError)
+          }
+        } catch (err) {
+          console.error("[v0] Error creating profile:", err)
+        }
+
+        console.log("[v0] Redirecting to profile check")
         router.push("/auth/check-profile")
       }
     } catch (err) {

@@ -369,19 +369,25 @@ function ProfileSetupContent() {
 
       console.log("[v0] Saving profile to database:", { playerName, selectedAvatar, userId: user.id })
 
-      // Save to database
-      const { error: updateError } = await supabase
+      // Save to database (upsert to handle both new and existing users)
+      const { error: upsertError } = await supabase
         .from("user_profiles")
-        .update({
+        .upsert({
+          user_id: user.id,
+          email: user.email!,
           player_name: playerName.trim(),
           avatar_id: selectedAvatar,
           profile_complete: true,
+          display_name: user.user_metadata?.full_name || user.email?.split("@")[0],
+          avatar_url: user.user_metadata?.avatar_url,
+          provider: user.app_metadata?.provider || "email",
           updated_at: new Date().toISOString(),
+        }, {
+          onConflict: "user_id"
         })
-        .eq("user_id", user.id)
 
-      if (updateError) {
-        console.error("[v0] Error saving profile:", updateError)
+      if (upsertError) {
+        console.error("[v0] Error saving profile:", upsertError)
         toast({
           title: "Save failed",
           description: "Failed to save your profile. Please try again.",
