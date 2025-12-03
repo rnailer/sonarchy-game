@@ -233,6 +233,12 @@ export default function PlaytimePlayback() {
 
       if (!allPlayers || allPlayers.length === 0) {
         addDebugLog("✅ All songs have been played! Navigating to round completion...")
+
+        // Pause Spotify if host
+        if (isHost && spotifyAccessToken) {
+          await pauseSpotifyPlayback(spotifyAccessToken)
+        }
+
         // Use the last song's player ID (current_song_player_id) for navigation
         const lastSongPlayerId = game.current_song_player_id || ""
         router.push(
@@ -657,6 +663,32 @@ export default function PlaytimePlayback() {
     }
   }
 
+  const pauseSpotifyPlayback = async (token: string) => {
+    if (!token) {
+      addDebugLog("⚠️ No token available for pause")
+      return
+    }
+
+    addDebugLog("⏸️ === PAUSING SPOTIFY PLAYBACK ===")
+    try {
+      const response = await fetch("https://api.spotify.com/v1/me/player/pause", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (response.ok || response.status === 204) {
+        addDebugLog("✅ Spotify playback paused successfully")
+      } else {
+        const errorText = await response.text()
+        addDebugLog(`⚠️ Pause response: ${response.status} - ${errorText}`)
+      }
+    } catch (error) {
+      addDebugLog(`❌ Failed to pause Spotify: ${error}`)
+    }
+  }
+
   const startSpotifyPlayback = async (token: string, deviceId: string) => {
     if (!playerData) {
       addDebugLog("⏳ Waiting for player data...")
@@ -757,6 +789,12 @@ export default function PlaytimePlayback() {
         if (audioRef.current) {
           audioRef.current.pause()
         }
+
+        // Pause Spotify if host
+        if (isHost && spotifyAccessToken) {
+          await pauseSpotifyPlayback(spotifyAccessToken)
+        }
+
         setSongEnded(true)
         setShowOverlay(true)
         setVoteResult("extend")
@@ -797,6 +835,11 @@ export default function PlaytimePlayback() {
         addDebugLog("⏭️ Song skipped by vote, going to leaderboard")
         if (audioRef.current) {
           audioRef.current.pause()
+        }
+
+        // Pause Spotify if host
+        if (isHost && spotifyAccessToken) {
+          await pauseSpotifyPlayback(spotifyAccessToken)
         }
 
         markSongAsPlayed()
@@ -958,6 +1001,16 @@ export default function PlaytimePlayback() {
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
     }
   }, [chatMessages])
+
+  // Cleanup: pause Spotify when component unmounts or user navigates away
+  useEffect(() => {
+    return () => {
+      if (spotifyAccessToken && isHost && playbackStarted) {
+        addDebugLog("🧹 Component unmounting - pausing Spotify playback")
+        pauseSpotifyPlayback(spotifyAccessToken)
+      }
+    }
+  }, [spotifyAccessToken, isHost, playbackStarted])
 
   useEffect(() => {
     if (!gameCode) return
