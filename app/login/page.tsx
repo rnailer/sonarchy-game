@@ -32,54 +32,19 @@ export default function LoginPage() {
     checkAuth()
   }, [router])
 
+  // FIX #2: Google/Apple auth - show toast instead of redirecting to broken OAuth
   const handleGoogleAuth = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (error) throw error
-    } catch (err: any) {
-      console.error("[v0] Google auth error:", err)
-      setError("Google sign in is not available yet. Please use email.")
-      toast({
-        title: "Coming soon",
-        description: "Google sign in will be available soon. Please use email for now.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+    toast({
+      title: "Coming soon",
+      description: "Google sign in will be available soon. Please use email for now.",
+    })
   }
 
   const handleAppleAuth = async () => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      const supabase = createClient()
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "apple",
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      })
-      if (error) throw error
-    } catch (err: any) {
-      console.error("[v0] Apple auth error:", err)
-      setError("Apple sign in is not available yet. Please use email.")
-      toast({
-        title: "Coming soon",
-        description: "Apple sign in will be available soon. Please use email for now.",
-        variant: "destructive",
-      })
-    } finally {
-      setIsLoading(false)
-    }
+    toast({
+      title: "Coming soon",
+      description: "Apple sign in will be available soon. Please use email for now.",
+    })
   }
 
   const handleEmailSignup = async () => {
@@ -152,6 +117,7 @@ export default function LoginPage() {
     }
   }
 
+  // FIX #1: For existing users who signed up with magic link, use magic link to sign in
   const handleEmailSignin = async () => {
     if (!email.trim()) {
       setError("Please enter your email address")
@@ -172,7 +138,15 @@ export default function LoginPage() {
         password: password,
       })
 
-      if (error) throw error
+      if (error) {
+        // FIX #1: If password login fails, suggest using magic link
+        if (error.message.includes("Invalid login")) {
+          setError("Invalid email or password. If you signed up with a magic link, use 'Send me a sign in link' below.")
+        } else {
+          setError(error.message || "Failed to sign in. Please try again.")
+        }
+        return
+      }
 
       if (data?.user) {
         console.log("[v0] Sign in successful")
@@ -180,11 +154,7 @@ export default function LoginPage() {
       }
     } catch (err: any) {
       console.error("[v0] Signin error:", err)
-      if (err.message.includes("Invalid login")) {
-        setError("Invalid email or password. Please try again.")
-      } else {
-        setError(err.message || "Failed to sign in. Please try again.")
-      }
+      setError(err.message || "Failed to sign in. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -280,12 +250,17 @@ export default function LoginPage() {
           Sign up with Email
         </Button>
 
-        <button
+        {/* FIX #3: Sign in as a button instead of a text link */}
+        <Button
           onClick={() => setAuthStep("signin")}
-          className="w-full text-center text-white/70 hover:text-white text-sm transition-colors py-2"
+          variant="outline"
+          className="w-full h-14 bg-transparent hover:bg-white/10 text-white border-white/30 hover:border-white/50 font-medium rounded-xl transition-all duration-200"
         >
-          Already have an account? <span className="text-cyan-400 hover:text-cyan-300 underline">Sign in</span>
-        </button>
+          <svg className="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+          </svg>
+          Sign in to existing account
+        </Button>
       </div>
     </motion.div>
   )
@@ -485,7 +460,7 @@ export default function LoginPage() {
             animate={{ opacity: 1, y: 0 }}
             className="text-red-400 text-sm flex items-center gap-2"
           >
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
             </svg>
             {error}
