@@ -7,6 +7,7 @@ import { ArrowLeft, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { createBrowserClient } from "@supabase/ssr"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 interface EmojiParticle {
   id: string
@@ -48,9 +49,16 @@ export default function PlaytimeWaitingPage() {
   const [choosingPlayerId, setChoosingPlayerId] = useState<string>("")
   const [choosingPlayerName, setChoosingPlayerName] = useState<string>("")
   const [choosingPlayerAvatar, setChoosingPlayerAvatar] = useState<string>("")
-  const [timeRemaining, setTimeRemaining] = useState(60)
   const [loadingTimeout, setLoadingTimeout] = useState(false)
   const [waitingDuration, setWaitingDuration] = useState(0)
+  const timerStartedRef = useRef(false)
+
+  // Server-synchronized timer
+  const { timeRemaining, isExpired, startTimer } = useServerTimer({
+    gameId,
+    timerType: "waiting",
+    enabled: !!gameId,
+  })
 
   const [isChatOpen, setIsChatOpen] = useState(false)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
@@ -301,12 +309,15 @@ export default function PlaytimeWaitingPage() {
     }
   }
 
+  // Start the server timer once gameId is available
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
-      return () => clearTimeout(timer)
+    if (gameId && !timerStartedRef.current) {
+      timerStartedRef.current = true
+      startTimer(60).then(() => {
+        console.log("[v0] ⏱️ Started 60s waiting timer")
+      })
     }
-  }, [timeRemaining])
+  }, [gameId, startTimer])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)

@@ -10,6 +10,7 @@ import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { getGameState } from "@/lib/game-state"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const ALL_PRESET_CATEGORIES = [
   { emoji: "🐾", text: "Songs with an animal in the title" },
@@ -83,16 +84,30 @@ export default function SelectCategory() {
   const playerName = searchParams.get("playerName") || "Player"
   const playerAvatar = searchParams.get("avatar") || "vinyl"
 
-  const [timeRemaining, setTimeRemaining] = useState(60)
+  const [gameId, setGameId] = useState<string>("")
   const [categoryInput, setCategoryInput] = useState("")
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
   const [presetCategories, setPresetCategories] = useState<typeof ALL_PRESET_CATEGORIES>([])
   const [isMuted, setIsMuted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
+  const timerStartedRef = useRef(false)
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(true)
+
+  // Server-synchronized timer
+  const { timeRemaining, isExpired, startTimer } = useServerTimer({
+    gameId,
+    timerType: "category_selection",
+    onExpire: () => {
+      const randomPreset = presetCategories[Math.floor(Math.random() * presetCategories.length)]
+      const url = `/category-selected?category=${encodeURIComponent(randomPreset.text)}&code=${gameCode}`
+      addDebug(`⏰ Time's up! Auto-selecting: ${randomPreset.text}`)
+      router.push(url)
+    },
+    enabled: !!gameId,
+  })
 
   const addDebug = (msg: string) => {
     if (!SHOW_DEBUG) return;
@@ -117,6 +132,7 @@ export default function SelectCategory() {
         .single()
 
       if (game) {
+        setGameId(game.id) // Set gameId for server timer
         addDebug(`📋 Round: ${game.current_round}`)
 
         const { data: player } = await supabase
@@ -155,19 +171,15 @@ export default function SelectCategory() {
     }
   }, [isMuted])
 
+  // Start the server timer once gameId is available
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else {
-      const randomPreset = presetCategories[Math.floor(Math.random() * presetCategories.length)]
-      const url = `/category-selected?category=${encodeURIComponent(randomPreset.text)}&code=${gameCode}`
-      addDebug(`⏰ Time's up! Auto-selecting: ${randomPreset.text}`)
-      router.push(url)
+    if (gameId && !timerStartedRef.current && presetCategories.length > 0) {
+      timerStartedRef.current = true
+      startTimer(60).then(() => {
+        addDebug("⏱️ Started 60s category selection timer")
+      })
     }
-  }, [timeRemaining, presetCategories, router, gameCode])
+  }, [gameId, startTimer, presetCategories.length])
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)

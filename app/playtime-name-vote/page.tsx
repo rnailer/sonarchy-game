@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { saveGameState, getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 export default function PlaytimeNameVote() {
   const router = useRouter()
@@ -24,7 +25,6 @@ export default function PlaytimeNameVote() {
   const [isLoadingPlayers, setIsLoadingPlayers] = useState(true)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
-  const [timeRemaining, setTimeRemaining] = useState(10) // Reduced timer from 30 to 10 seconds
   const [isMuted, setIsMuted] = useState(false)
   const [selectedVote, setSelectedVote] = useState<"hide" | "show" | null>(null)
   const [hideVotes, setHideVotes] = useState(0)
@@ -32,6 +32,26 @@ export default function PlaytimeNameVote() {
   const [showOverlay, setShowOverlay] = useState(false)
   const [voteResult, setVoteResult] = useState<"hide" | "show" | null>(null)
   const [isSavingVote, setIsSavingVote] = useState(false)
+  const timerStartedRef = useRef(false)
+
+  // Server-synchronized timer
+  const { timeRemaining, isExpired, startTimer } = useServerTimer({
+    gameId: gameId || "",
+    timerType: "name_vote",
+    onExpire: () => {
+      const result = showVotes > hideVotes ? "show" : "hide"
+      setVoteResult(result)
+      setShowOverlay(true)
+      saveGameState({ showNames: result === "show" })
+
+      setTimeout(() => {
+        router.push(
+          `/playtime-waiting?category=${encodeURIComponent(selectedCategory)}&showNames=${result === "show"}&code=${gameCode}`,
+        )
+      }, 1000)
+    },
+    enabled: !!gameId,
+  })
 
 
 
@@ -46,26 +66,36 @@ export default function PlaytimeNameVote() {
     }
   }, [currentRound, hasVotedBefore, showNames, router, selectedCategory, gameCode])
 
+  // Fetch gameId and start timer
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else {
-      const result = showVotes > hideVotes ? "show" : "hide"
-      setVoteResult(result)
-      setShowOverlay(true)
+    const loadGameData = async () => {
+      if (!gameCode) return
 
-      saveGameState({ showNames: result === "show" })
+      const supabase = createClient()
+      const { data: game } = await supabase
+        .from("games")
+        .select("id")
+        .eq("game_code", gameCode)
+        .single()
 
-      setTimeout(() => {
-        router.push(
-          `/playtime-waiting?category=${encodeURIComponent(selectedCategory)}&showNames=${result === "show"}&code=${gameCode}`,
-        )
-      }, 1000)
+      if (game) {
+        setGameId(game.id)
+        setIsLoadingPlayers(false)
+      }
     }
-  }, [timeRemaining, hideVotes, showVotes, router, selectedCategory, gameCode])
+
+    loadGameData()
+  }, [gameCode])
+
+  // Start the server timer once gameId is available
+  useEffect(() => {
+    if (gameId && !timerStartedRef.current) {
+      timerStartedRef.current = true
+      startTimer(10).then(() => {
+        console.log("[v0] ⏱️ Started 10s name vote timer")
+      })
+    }
+  }, [gameId, startTimer])
 
   const handleVote = async (vote: "hide" | "show") => {
     if (isSavingVote) {
