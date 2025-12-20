@@ -279,12 +279,17 @@ export default function Leaderboard() {
       }
 
       // Step 6: All songs in round complete - check if game should end
-      console.log("[v0] 🎯 Round complete! Checking if game should end...")
-      console.log("[v0] 📊 Current round:", game.current_round)
-      console.log("[v0] 📊 Total players:", totalPlayerCount)
+      console.log("[v0] ========================================")
+      console.log("[v0] 🎯 ROUND ROTATION DECISION POINT")
+      console.log("[v0] ========================================")
+      console.log("[v0] 📊 Current round:", game.current_round, "(type:", typeof game.current_round, ")")
+      console.log("[v0] 📊 Total players:", totalPlayerCount, "(type:", typeof totalPlayerCount, ")")
+      console.log("[v0] 📊 All players:", allPlayers.map(p => p.player_name).join(", "))
       console.log("[v0] 🔍 Game should end if:", `${game.current_round} >= ${totalPlayerCount}`)
+      console.log("[v0] 🔍 Comparison:", game.current_round, ">=", totalPlayerCount, "=", game.current_round >= totalPlayerCount)
       console.log("[v0] 🔍 Result:", game.current_round >= totalPlayerCount ? "YES - END GAME" : "NO - CONTINUE TO NEXT ROUND")
       console.log("[v0] ⚠️ SONG OWNER DEBUG: Decision point reached by", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
+      console.log("[v0] ========================================")
 
       if (game.current_round >= totalPlayerCount) {
         // Game complete!
