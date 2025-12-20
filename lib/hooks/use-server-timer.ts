@@ -164,10 +164,21 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       )
       .subscribe()
 
+    // Handle page visibility changes (when app returns from background)
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log(`[ServerTimer] Page visible again, recalculating ${timerType} timer`)
+        updateTimer()
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+
     // Cleanup
     return () => {
       if (intervalId) clearInterval(intervalId)
       subscription.unsubscribe()
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
   }, [enabled, gameId, timerType, isExpired])
 
