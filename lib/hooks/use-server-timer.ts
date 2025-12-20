@@ -53,16 +53,26 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
   }, [onExpire])
 
   const startTimer = async (duration: number) => {
+    if (!gameId) {
+      console.error(`[ServerTimer] Cannot start timer: gameId is empty`)
+      return
+    }
+
     const supabase = createClient()
     const field = FIELD_MAP[timerType]
     const durationField = field.replace("_start_time", "_duration")
 
     // Check if a timer is already running
-    const { data: existingGame } = await supabase
+    const { data: existingGame, error: fetchError } = await supabase
       .from("games")
       .select(`${field}, ${durationField}`)
       .eq("id", gameId)
-      .single()
+      .maybeSingle()
+
+    if (fetchError) {
+      console.error(`[ServerTimer] Error fetching existing timer:`, fetchError)
+      return
+    }
 
     if (existingGame && existingGame[field]) {
       const existingStartTime = new Date(existingGame[field]).getTime()
@@ -78,13 +88,18 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
     // Start new timer
     const now = new Date().toISOString()
-    await supabase
+    const { error: updateError } = await supabase
       .from("games")
       .update({
         [field]: now,
         [durationField]: duration,
       })
       .eq("id", gameId)
+
+    if (updateError) {
+      console.error(`[ServerTimer] Error starting timer:`, updateError)
+      return
+    }
 
     console.log(`[ServerTimer] Started ${timerType} timer for ${duration}s at ${now}`)
   }
@@ -127,7 +142,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
         .from("games")
         .select(`${field}, ${durationField}`)
         .eq("id", gameId)
-        .single()
+        .maybeSingle()
 
       if (error) {
         console.error(`[ServerTimer] Error fetching timer:`, error)
