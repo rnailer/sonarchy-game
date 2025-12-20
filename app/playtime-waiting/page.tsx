@@ -53,10 +53,10 @@ export default function PlaytimeWaitingPage() {
   const [waitingDuration, setWaitingDuration] = useState(0)
   const timerStartedRef = useRef(false)
 
-  // Server-synchronized timer
+  // Server-synchronized timer - use category_selection to sync with picker
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
     gameId,
-    timerType: "waiting",
+    timerType: "category_selection",
     enabled: !!gameId,
   })
 
@@ -309,15 +309,8 @@ export default function PlaytimeWaitingPage() {
     }
   }
 
-  // Start the server timer once gameId is available
-  useEffect(() => {
-    if (gameId && !timerStartedRef.current) {
-      timerStartedRef.current = true
-      startTimer(60).then(() => {
-        console.log("[v0] ⏱️ Started 60s waiting timer")
-      })
-    }
-  }, [gameId, startTimer])
+  // Don't start timer - just read the category_selection timer started by the picker
+  // The timer will be automatically synced via useServerTimer hook
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
