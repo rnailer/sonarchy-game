@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 
 interface UseServerTimerOptions {
   gameId: string
-  timerType: "song" | "leaderboard" | "category_selection" | "waiting" | "name_vote"
+  timerType: "song" | "leaderboard" | "category_selection" | "waiting" | "name_vote" | "song_selection"
   onExpire?: () => void
   enabled?: boolean
 }
@@ -24,6 +24,7 @@ const FIELD_MAP = {
   category_selection: "category_selection_start_time",
   waiting: "waiting_start_time",
   name_vote: "name_vote_start_time",
+  song_selection: "song_selection_start_time",
 } as const
 
 /**
@@ -79,11 +80,20 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       const existingDuration = existingGame[durationField] || duration
       const elapsed = Math.floor((Date.now() - existingStartTime) / 1000)
 
-      // If timer is still running (not expired), don't start a new one
-      if (elapsed < existingDuration) {
-        console.log(`[ServerTimer] Timer already running for ${timerType}, skipping start`)
+      console.log(`[ServerTimer] Existing timer check for ${timerType}:`, {
+        elapsed,
+        duration: existingDuration,
+        startTime: existingGame[field],
+        isExpired: elapsed >= existingDuration,
+      })
+
+      // Only skip if timer is actually still running (not expired) and elapsed is valid
+      if (elapsed >= 0 && elapsed < existingDuration) {
+        console.log(`[ServerTimer] Timer already running for ${timerType} (${existingDuration - elapsed}s remaining), skipping start`)
         return
       }
+
+      console.log(`[ServerTimer] Timer expired or invalid, will restart`)
     }
 
     // Start new timer
@@ -152,15 +162,28 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       if (data && data[field] && data[durationField]) {
         startTimeCache = data[field]
         durationCache = data[durationField]
+
+        const elapsed = Math.floor((Date.now() - new Date(startTimeCache).getTime()) / 1000)
+        const remaining = durationCache - elapsed
+
         console.log(`[ServerTimer] Loaded ${timerType} timer:`, {
           startTime: startTimeCache,
           duration: durationCache,
+          elapsed,
+          remaining,
+          isExpired: remaining <= 0,
         })
 
-        updateTimer()
-
-        // Update every second
-        intervalId = setInterval(updateTimer, 1000)
+        // Only start interval if timer hasn't expired
+        if (remaining > 0) {
+          updateTimer()
+          // Update every second
+          intervalId = setInterval(updateTimer, 1000)
+        } else {
+          console.warn(`[ServerTimer] Loaded timer is already expired, showing 0`)
+          setTimeRemaining(0)
+          setIsExpired(true)
+        }
       } else {
         console.log(`[ServerTimer] No active ${timerType} timer found`)
       }

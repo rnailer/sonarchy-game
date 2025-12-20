@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { useToast } from "@/hooks/use-toast"
 import { savePlayerData, getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 import { checkDuplicateSpotifyAccounts } from "@/app/actions/spotify"
 
@@ -34,8 +35,23 @@ export default function PickYourSong() {
   const { toast } = useToast()
   const playerName = searchParams.get("player") || "Rich"
   const category = searchParams.get("category") || "Songs about cars or driving"
+  const gameCode = searchParams.get("code")
 
-  const [timeRemaining, setTimeRemaining] = useState(60)
+  const [gameId, setGameId] = useState<string>("")
+  const timerStartedRef = useRef(false)
+
+  // Server-synchronized timer
+  const { timeRemaining, isExpired, startTimer } = useServerTimer({
+    gameId,
+    timerType: "song_selection",
+    onExpire: () => {
+      console.log("[v0] Song selection timer expired")
+      if (selectedTrack) {
+        handleLockIn()
+      }
+    },
+    enabled: !!gameId,
+  })
 
   const [searchInput, setSearchInput] = useState("")
   const [isMuted, setIsMuted] = useState(false)
@@ -82,27 +98,37 @@ export default function PickYourSong() {
     }
   }, [isMuted])
 
+  // Fetch gameId and start timer
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else {
-      const gameCode = searchParams.get("code")
+    const loadGameData = async () => {
+      if (!gameCode) return
 
-      if (!selectedTrack) {
-        toast({
-          title: "Time's up!",
-          description: "No song selected. Please try again.",
-          variant: "destructive",
-        })
-        console.log("[v0] Timer expired - no song selected")
+      const supabase = createClient()
+      const { data: game } = await supabase
+        .from("games")
+        .select("id")
+        .eq("game_code", gameCode)
+        .maybeSingle()
+
+      if (game) {
+        setGameId(game.id)
       }
-
-      router.push(`/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}&remainingTime=0`)
     }
-  }, [timeRemaining, router, category, selectedTrack, toast, searchParams])
+
+    loadGameData()
+  }, [gameCode])
+
+  // Start the server timer once gameId is available
+  useEffect(() => {
+    if (gameId && !timerStartedRef.current) {
+      timerStartedRef.current = true
+      startTimer(60).then(() => {
+        console.log("[v0] ⏱️ Started 60s song selection timer")
+      }).catch((err) => {
+        console.error("[v0] Failed to start song selection timer:", err)
+      })
+    }
+  }, [gameId, startTimer])
 
   useEffect(() => {
     const fetchPickedSongs = async () => {
