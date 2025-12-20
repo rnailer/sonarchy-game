@@ -54,11 +54,30 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
   const startTimer = async (duration: number) => {
     const supabase = createClient()
-    const now = new Date().toISOString()
-
     const field = FIELD_MAP[timerType]
     const durationField = field.replace("_start_time", "_duration")
 
+    // Check if a timer is already running
+    const { data: existingGame } = await supabase
+      .from("games")
+      .select(`${field}, ${durationField}`)
+      .eq("id", gameId)
+      .single()
+
+    if (existingGame && existingGame[field]) {
+      const existingStartTime = new Date(existingGame[field]).getTime()
+      const existingDuration = existingGame[durationField] || duration
+      const elapsed = Math.floor((Date.now() - existingStartTime) / 1000)
+
+      // If timer is still running (not expired), don't start a new one
+      if (elapsed < existingDuration) {
+        console.log(`[ServerTimer] Timer already running for ${timerType}, skipping start`)
+        return
+      }
+    }
+
+    // Start new timer
+    const now = new Date().toISOString()
     await supabase
       .from("games")
       .update({
