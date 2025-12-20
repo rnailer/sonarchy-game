@@ -86,7 +86,7 @@ export default function GameStarting() {
           addDebug(`I'm picker! Navigating to: ${url}`)
           router.push(url)
         } else {
-          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(firstPicker.player_name)}`
+          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(firstPicker.id)}`
           addDebug(`Not picker. Navigating to: ${url}`)
           router.push(url)
         }
@@ -98,7 +98,7 @@ export default function GameStarting() {
           addDebug(`Fallback: Host navigating to: ${url}`)
           router.push(url)
         } else {
-          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(picker?.player_name || "")}`
+          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(picker?.id || "")}`
           addDebug(`Fallback: Non-host navigating to: ${url}`)
           router.push(url)
         }

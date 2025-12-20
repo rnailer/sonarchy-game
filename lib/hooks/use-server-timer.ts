@@ -44,7 +44,7 @@ const FIELD_MAP = {
  */
 export function useServerTimer(options: UseServerTimerOptions): UseServerTimerReturn {
   const { gameId, timerType, onExpire, enabled = true } = options
-  const [timeRemaining, setTimeRemaining] = useState(0)
+  const [timeRemaining, setTimeRemaining] = useState(60) // Show 60 as default instead of 0
   const [isExpired, setIsExpired] = useState(false)
   const onExpireRef = useRef(onExpire)
 
@@ -59,9 +59,13 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       return
     }
 
+    console.log(`[ServerTimer] startTimer called for ${timerType} with duration ${duration}s`)
+
     const supabase = createClient()
     const field = FIELD_MAP[timerType]
     const durationField = field.replace("_start_time", "_duration")
+
+    console.log(`[ServerTimer] Using fields: ${field}, ${durationField}`)
 
     // Check if a timer is already running
     const { data: existingGame, error: fetchError } = await supabase
@@ -98,20 +102,24 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
     // Start new timer
     const now = new Date().toISOString()
-    const { error: updateError } = await supabase
+    console.log(`[ServerTimer] Writing to database:`, { gameId, field, now, durationField, duration })
+
+    const { data: updateData, error: updateError } = await supabase
       .from("games")
       .update({
         [field]: now,
         [durationField]: duration,
       })
       .eq("id", gameId)
+      .select()
 
     if (updateError) {
       console.error(`[ServerTimer] Error starting timer:`, updateError)
       return
     }
 
-    console.log(`[ServerTimer] Started ${timerType} timer for ${duration}s at ${now}`)
+    console.log(`[ServerTimer] ✅ Started ${timerType} timer for ${duration}s at ${now}`)
+    console.log(`[ServerTimer] Update result:`, updateData)
   }
 
   useEffect(() => {
