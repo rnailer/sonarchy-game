@@ -96,11 +96,21 @@ export default function SelectCategory() {
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(true)
 
+  const addDebug = (msg: string) => {
+    if (!SHOW_DEBUG) return;
+    setDebugInfo((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`])
+  }
+
   // Server-synchronized timer
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
     gameId,
     timerType: "category_selection",
     onExpire: () => {
+      console.log("[v0] Category selection timer expired")
+      if (presetCategories.length === 0) {
+        console.error("[v0] No preset categories available!")
+        return
+      }
       const randomPreset = presetCategories[Math.floor(Math.random() * presetCategories.length)]
       const url = `/category-selected?category=${encodeURIComponent(randomPreset.text)}&code=${gameCode}`
       addDebug(`⏰ Time's up! Auto-selecting: ${randomPreset.text}`)
@@ -108,11 +118,6 @@ export default function SelectCategory() {
     },
     enabled: !!gameId,
   })
-
-  const addDebug = (msg: string) => {
-    if (!SHOW_DEBUG) return;
-    setDebugInfo((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`])
-  }
 
   useEffect(() => {
     setPresetCategories(getRandomCategories(10))
@@ -173,10 +178,15 @@ export default function SelectCategory() {
 
   // Start the server timer once gameId is available
   useEffect(() => {
+    console.log("[v0] Timer start check:", { gameId, timerStarted: timerStartedRef.current, presetsLoaded: presetCategories.length })
     if (gameId && !timerStartedRef.current && presetCategories.length > 0) {
       timerStartedRef.current = true
+      console.log("[v0] Starting category selection timer...")
       startTimer(60).then(() => {
+        console.log("[v0] Timer started successfully")
         addDebug("⏱️ Started 60s category selection timer")
+      }).catch((err) => {
+        console.error("[v0] Failed to start timer:", err)
       })
     }
   }, [gameId, startTimer, presetCategories.length])
