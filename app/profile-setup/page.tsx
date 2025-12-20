@@ -77,14 +77,29 @@ function ProfileSetupContent() {
           setDebugInfo((prev) => [...prev, `❌ Error loading profile: ${profileError.message}`])
         }
 
-        // Load profile data from database (not localStorage)
+        // Load profile data from database first, fallback to localStorage
         if (profile?.player_name) {
           setPlayerName(profile.player_name)
           setDebugInfo((prev) => [...prev, `✅ Loaded player name from DB`])
+        } else {
+          // Fallback to localStorage (useful after OAuth redirect)
+          const localName = safeStorage.getItem("player_name")
+          if (localName) {
+            setPlayerName(localName)
+            setDebugInfo((prev) => [...prev, `✅ Loaded player name from localStorage`])
+          }
         }
+
         if (profile?.avatar_id) {
           setSelectedAvatar(profile.avatar_id)
           setDebugInfo((prev) => [...prev, `✅ Loaded avatar from DB`])
+        } else {
+          // Fallback to localStorage (useful after OAuth redirect)
+          const localAvatar = safeStorage.getItem("player_avatar")
+          if (localAvatar) {
+            setSelectedAvatar(localAvatar)
+            setDebugInfo((prev) => [...prev, `✅ Loaded avatar from localStorage`])
+          }
         }
 
         // Check Spotify connection from database
