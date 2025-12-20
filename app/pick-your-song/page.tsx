@@ -294,6 +294,12 @@ export default function PickYourSong() {
     return () => clearTimeout(delayDebounceFn)
   }, [searchInput])
 
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, "0")}`
+  }
+
   const handleSearch = async () => {
     if (!searchInput.trim()) return
 
@@ -754,7 +760,7 @@ export default function PickYourSong() {
                 textShadow: "2px 2px 0px #0D113B",
               }}
             >
-              {timeRemaining}
+              {formatTime(timeRemaining)}
             </span>
           </div>
 

@@ -46,6 +46,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
   const { gameId, timerType, onExpire, enabled = true } = options
   const [timeRemaining, setTimeRemaining] = useState(60) // Show 60 as default instead of 0
   const [isExpired, setIsExpired] = useState(false)
+  const [timerVersion, setTimerVersion] = useState(0) // Increment to trigger re-fetch
   const onExpireRef = useRef(onExpire)
 
   // Keep onExpire ref up to date
@@ -120,6 +121,9 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
     console.log(`[ServerTimer] ✅ Started ${timerType} timer for ${duration}s at ${now}`)
     console.log(`[ServerTimer] Update result:`, updateData)
+
+    // Trigger re-fetch to start countdown
+    setTimerVersion(v => v + 1)
   }
 
   useEffect(() => {
@@ -245,7 +249,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       subscription.unsubscribe()
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [enabled, gameId, timerType, isExpired])
+  }, [enabled, gameId, timerType, isExpired, timerVersion]) // Added timerVersion to trigger re-fetch
 
   return {
     timeRemaining,
