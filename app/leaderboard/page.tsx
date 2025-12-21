@@ -254,23 +254,25 @@ export default function Leaderboard() {
       await supabase.from("game_players").update({ song_played: true }).eq("id", currentSongPlayerId)
       console.log("[v0] ✅ Marked song as played")
 
-      // Step 5: Check for next unplayed song in current round
+      // Step 5: Check for next unplayed song in current round (RANDOM ORDER)
       const { data: unplayedSongs } = await supabase
         .from("game_players")
         .select("id, player_name, song_title")
         .eq("game_id", gameId)
         .not("song_uri", "is", null)
         .eq("song_played", false)
-        .order("joined_at", { ascending: true })
 
-      console.log("[v0] 🔍 Unplayed songs remaining:", unplayedSongs?.length || 0)
+      // Randomize the order instead of sequential by joined_at
+      const shuffledSongs = unplayedSongs?.sort(() => Math.random() - 0.5) || []
 
-      if (unplayedSongs && unplayedSongs.length > 0) {
-        // More songs to play in this round
-        console.log("[v0] ➡️ Moving to next song:", unplayedSongs[0].song_title)
+      console.log("[v0] 🔍 Unplayed songs remaining:", shuffledSongs.length)
+
+      if (shuffledSongs.length > 0) {
+        // More songs to play in this round (RANDOM ORDER)
+        console.log("[v0] ➡️ Moving to next song (random):", shuffledSongs[0].song_title)
 
         // Set next song as current (synchronized for all clients)
-        await supabase.from("games").update({ current_song_player_id: unplayedSongs[0].id }).eq("id", gameId)
+        await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
 
         hasNavigated.current = true
         await new Promise((resolve) => setTimeout(resolve, 500))
@@ -361,15 +363,14 @@ export default function Leaderboard() {
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
 
-      // Determine whose turn it is to select category
-      const startingIndex = game.starting_player_index || 0
-      const turnIndex = (startingIndex + nextRound - 1) % totalPlayerCount
-      const nextTurnPlayer = allPlayers[turnIndex]
+      // Determine whose turn it is to select category (RANDOM, not sequential)
+      const randomPlayerIndex = Math.floor(Math.random() * totalPlayerCount)
+      const nextTurnPlayer = allPlayers[randomPlayerIndex]
       const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
 
-      console.log("[v0] 🎲 Next turn calculation:")
-      console.log("[v0] - Starting index:", startingIndex)
-      console.log("[v0] - Turn index:", turnIndex)
+      console.log("[v0] 🎲 Next turn calculation (RANDOM):")
+      console.log("[v0] - Total players:", totalPlayerCount)
+      console.log("[v0] - Random index:", randomPlayerIndex)
       console.log("[v0] - Next player:", nextTurnPlayer.player_name)
       console.log("[v0] - Am I next?", myPlayerId === nextTurnPlayer.id)
 
