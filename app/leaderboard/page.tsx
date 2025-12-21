@@ -327,30 +327,39 @@ export default function Leaderboard() {
       const nextRound = game.current_round + 1
       console.log("[v0] ➡️ Moving to round:", nextRound)
 
-      // Reset for next round
-      await supabase
-        .from("games")
-        .update({
-          current_round: nextRound,
-          current_category: null,
-          current_song_player_id: null,
-        })
-        .eq("id", gameId)
+      // CRITICAL FIX: Only song owner updates database to prevent race condition
+      if (isSongOwner) {
+        console.log("[v0] 🎭 SONG OWNER: Incrementing round and resetting game state")
 
-      await supabase
-        .from("game_players")
-        .update({
-          has_selected_category: false,
-          song_played: false,
-          song_uri: null,
-          song_title: null,
-          song_artist: null,
-          song_preview_url: null,
-          album_cover_url: null,
-        })
-        .eq("game_id", gameId)
+        // Reset for next round
+        await supabase
+          .from("games")
+          .update({
+            current_round: nextRound,
+            current_category: null,
+            current_song_player_id: null,
+          })
+          .eq("id", gameId)
 
-      console.log("[v0] 🧹 Reset all player flags for next round")
+        await supabase
+          .from("game_players")
+          .update({
+            has_selected_category: false,
+            song_played: false,
+            song_uri: null,
+            song_title: null,
+            song_artist: null,
+            song_preview_url: null,
+            album_cover_url: null,
+          })
+          .eq("game_id", gameId)
+
+        console.log("[v0] 🧹 Reset all player flags for next round")
+      } else {
+        console.log("[v0] 👥 REGULAR PLAYER: Waiting for song owner to update database")
+        // Wait a moment for song owner to update
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
 
       // Determine whose turn it is to select category
       const startingIndex = game.starting_player_index || 0
