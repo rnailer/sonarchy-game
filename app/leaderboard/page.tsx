@@ -7,6 +7,8 @@ import { ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 
+const SHOW_DEBUG = true
+
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
   { border: "#B9F3FF", bg: "#0891B2", shadow: "#0E7490" },
@@ -46,6 +48,8 @@ export default function Leaderboard() {
 
   const hasNavigated = useRef(false)
   const isProcessingNavigation = useRef(false)
+
+  const [debugInfo, setDebugInfo] = useState<string[]>([])
 
   useEffect(() => {
     const fetchGameInfo = async () => {
@@ -291,6 +295,17 @@ export default function Leaderboard() {
       console.log("[v0] ⚠️ SONG OWNER DEBUG: Decision point reached by", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
       console.log("[v0] ========================================")
 
+      // Update debug panel
+      setDebugInfo([
+        `🎯 ROUND ROTATION DECISION`,
+        `📊 Current round: ${game.current_round} (${typeof game.current_round})`,
+        `📊 Total players: ${totalPlayerCount} (${typeof totalPlayerCount})`,
+        `📊 Players: ${allPlayers.map(p => p.player_name).join(", ")}`,
+        `🔍 Comparison: ${game.current_round} >= ${totalPlayerCount} = ${game.current_round >= totalPlayerCount}`,
+        `🔍 Result: ${game.current_round >= totalPlayerCount ? "END GAME" : "CONTINUE TO ROUND " + (game.current_round + 1)}`,
+        `⚠️ Player type: ${isSongOwner ? "SONG OWNER" : "REGULAR PLAYER"}`,
+      ])
+
       if (game.current_round >= totalPlayerCount) {
         // Game complete!
         console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All rounds played!")
@@ -438,6 +453,17 @@ export default function Leaderboard() {
 
   return (
     <div className="min-h-screen bg-[#000022] text-white flex flex-col">
+      {SHOW_DEBUG && debugInfo.length > 0 && (
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-red-600 text-white p-2 text-xs max-h-48 overflow-y-auto">
+          <div className="font-bold mb-1">🔍 DEBUG: Round Rotation Decision</div>
+          {debugInfo.map((info, i) => (
+            <div key={i} className="font-mono">
+              {info}
+            </div>
+          ))}
+        </div>
+      )}
+
       <header className="fixed top-[4.5rem] left-0 right-0 z-50 flex items-center justify-between px-3 bg-[#000022] pb-4">
         <Link href="/playtime-playback">
           <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 w-6 h-6 p-0">
