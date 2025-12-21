@@ -364,11 +364,37 @@ export default function PlayersLockedIn() {
         try {
           const { data: game } = await supabase
             .from("games")
-            .select("id, current_category")
+            .select("id, current_category, current_song_player_id")
             .eq("game_code", gameCode)
             .single()
 
           if (game) {
+            // CRITICAL: If no song is currently selected, select the first song randomly
+            if (!game.current_song_player_id) {
+              console.log("[v0] 🎲 No current song set, selecting first song randomly...")
+
+              const { data: playersWithSongs } = await supabase
+                .from("game_players")
+                .select("id, player_name, song_title")
+                .eq("game_id", game.id)
+                .not("song_uri", "is", null)
+                .eq("song_played", false)
+
+              if (playersWithSongs && playersWithSongs.length > 0) {
+                // Randomly select first song
+                const shuffled = playersWithSongs.sort(() => Math.random() - 0.5)
+                const firstSong = shuffled[0]
+
+                console.log("[v0] 🎵 Selected first song:", firstSong.song_title, "by", firstSong.player_name)
+
+                // Set it as current song
+                await supabase
+                  .from("games")
+                  .update({ current_song_player_id: firstSong.id })
+                  .eq("id", game.id)
+              }
+            }
+
             const actualCategory = game.current_category || category
             router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
           } else {
