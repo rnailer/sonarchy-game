@@ -363,14 +363,45 @@ export default function Leaderboard() {
         await new Promise((resolve) => setTimeout(resolve, 1000))
       }
 
-      // Determine whose turn it is to select category (RANDOM, not sequential)
-      const randomPlayerIndex = Math.floor(Math.random() * totalPlayerCount)
-      const nextTurnPlayer = allPlayers[randomPlayerIndex]
+      // Determine whose turn it is to select category
+      // Each player picks exactly once, but in random order
+      console.log("[v0] 🎲 Selecting next category picker...")
+
+      // Get players who haven't been category picker yet
+      const { data: playersWhoHaventPicked } = await supabase
+        .from("game_players")
+        .select("id, player_name")
+        .eq("game_id", gameId)
+        .eq("has_been_category_picker", false)
+        .order("joined_at", { ascending: true })
+
+      console.log("[v0] 📊 Players who haven't picked category:", playersWhoHaventPicked?.length || 0)
+
+      let nextTurnPlayer
+      if (playersWhoHaventPicked && playersWhoHaventPicked.length > 0) {
+        // Randomly select from players who haven't picked yet
+        const randomIndex = Math.floor(Math.random() * playersWhoHaventPicked.length)
+        nextTurnPlayer = playersWhoHaventPicked[randomIndex]
+
+        // Mark this player as having been the category picker
+        if (isSongOwner) {
+          await supabase
+            .from("game_players")
+            .update({ has_been_category_picker: true })
+            .eq("id", nextTurnPlayer.id)
+          console.log("[v0] ✅ Marked", nextTurnPlayer.player_name, "as category picker")
+        }
+      } else {
+        // Fallback: all players have picked, just pick randomly
+        const randomIndex = Math.floor(Math.random() * allPlayers.length)
+        nextTurnPlayer = allPlayers[randomIndex]
+      }
+
       const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
 
-      console.log("[v0] 🎲 Next turn calculation (RANDOM):")
+      console.log("[v0] 🎲 Next turn calculation (SMART RANDOM):")
       console.log("[v0] - Total players:", totalPlayerCount)
-      console.log("[v0] - Random index:", randomPlayerIndex)
+      console.log("[v0] - Remaining pickers:", playersWhoHaventPicked?.length || 0)
       console.log("[v0] - Next player:", nextTurnPlayer.player_name)
       console.log("[v0] - Am I next?", myPlayerId === nextTurnPlayer.id)
 
