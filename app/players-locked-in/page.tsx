@@ -375,10 +375,15 @@ export default function PlayersLockedIn() {
 
               const { data: playersWithSongs } = await supabase
                 .from("game_players")
-                .select("id, player_name, song_title")
+                .select("id, player_name, song_title, song_uri, song_played")
                 .eq("game_id", game.id)
                 .not("song_uri", "is", null)
                 .eq("song_played", false)
+
+              console.log("[v0] 📊 Players with unplayed songs:", playersWithSongs?.length || 0)
+              playersWithSongs?.forEach((p) => {
+                console.log("[v0] 📊 -", p.player_name, ":", p.song_title, "(song_played:", p.song_played, ")")
+              })
 
               if (playersWithSongs && playersWithSongs.length > 0) {
                 // Randomly select first song
@@ -392,7 +397,11 @@ export default function PlayersLockedIn() {
                   .from("games")
                   .update({ current_song_player_id: firstSong.id })
                   .eq("id", game.id)
+              } else {
+                console.log("[v0] ❌ WARNING: No unplayed songs found!")
               }
+            } else {
+              console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
             }
 
             const actualCategory = game.current_category || category

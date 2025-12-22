@@ -284,188 +284,35 @@ export default function Leaderboard() {
         return
       }
 
-      // Step 6: All songs in round complete - check if game should end
+      // Step 6: All songs in round complete - navigate to final placements for this round
       console.log("[v0] ========================================")
-      console.log("[v0] 🎯 ROUND ROTATION DECISION POINT")
+      console.log("[v0] 🎯 ROUND COMPLETE - GOING TO FINAL PLACEMENTS")
       console.log("[v0] ========================================")
-      console.log("[v0] 📊 Current round:", game.current_round, "(type:", typeof game.current_round, ")")
-      console.log("[v0] 📊 Total players:", totalPlayerCount, "(type:", typeof totalPlayerCount, ")")
+      console.log("[v0] 📊 Current round:", game.current_round)
+      console.log("[v0] 📊 Total players:", totalPlayerCount)
       console.log("[v0] 📊 All players:", allPlayers.map(p => p.player_name).join(", "))
-      console.log("[v0] 🔍 Game should end if:", `${game.current_round} >= ${totalPlayerCount}`)
-      console.log("[v0] 🔍 Comparison:", game.current_round, ">=", totalPlayerCount, "=", game.current_round >= totalPlayerCount)
-      console.log("[v0] 🔍 Result:", game.current_round >= totalPlayerCount ? "YES - END GAME" : "NO - CONTINUE TO NEXT ROUND")
-      console.log("[v0] ⚠️ SONG OWNER DEBUG: Decision point reached by", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
+      console.log("[v0] 📊 Game will end after placements if:", `${game.current_round} >= ${totalPlayerCount}`)
       console.log("[v0] ========================================")
 
       // Update debug panel
       setDebugInfo([
-        `🎯 ROUND ROTATION DECISION`,
-        `📊 Current round: ${game.current_round} (${typeof game.current_round})`,
-        `📊 Total players: ${totalPlayerCount} (${typeof totalPlayerCount})`,
-        `📊 Players: ${allPlayers.map(p => p.player_name).join(", ")}`,
-        `🔍 Comparison: ${game.current_round} >= ${totalPlayerCount} = ${game.current_round >= totalPlayerCount}`,
-        `🔍 Result: ${game.current_round >= totalPlayerCount ? "END GAME" : "CONTINUE TO ROUND " + (game.current_round + 1)}`,
-        `⚠️ Player type: ${isSongOwner ? "SONG OWNER" : "REGULAR PLAYER"}`,
+        `🎯 ROUND ${game.current_round} COMPLETE`,
+        `📊 Current round: ${game.current_round}`,
+        `📊 Total players: ${totalPlayerCount}`,
+        `📊 Going to: Final Placements for Round ${game.current_round}`,
+        `📊 After placements: ${game.current_round >= totalPlayerCount ? "FINAL RESULTS" : "ROUND " + (game.current_round + 1)}`,
       ])
-
-      if (game.current_round >= totalPlayerCount) {
-        // Game complete!
-        console.log("[v0] 🎉🎉🎉 GAME COMPLETE! All rounds played!")
-        console.log("[v0] 🎉 Total rounds completed:", game.current_round)
-        console.log("[v0] ⚠️ SONG OWNER DEBUG: Game ending for", isSongOwner ? "SONG OWNER" : "REGULAR PLAYER")
-
-        hasNavigated.current = true
-        await new Promise((resolve) => setTimeout(resolve, 800))
-
-        const timestamp = Date.now()
-        router.push(`/final-placements?code=${gameCode}&t=${timestamp}`)
-        return
-      }
 
       // CRITICAL: Set hasNavigated immediately to prevent double-polling
       hasNavigated.current = true
 
-      // Step 7: Start next round
-      console.log("[v0] 🔄 Starting next round...")
-      console.log("[v0] 🔄 Game will continue because:", `${game.current_round} < ${totalPlayerCount}`)
-
-      const nextRound = game.current_round + 1
-      console.log("[v0] ➡️ Moving to round:", nextRound)
-
-      // CRITICAL FIX: Only song owner updates database to prevent race condition
-      let nextCategoryPickerId: string
-      let nextPlayerName: string
-
-      if (isSongOwner) {
-        console.log("[v0] 🎭 SONG OWNER: Incrementing round and resetting game state")
-
-        // Get players who haven't been category picker yet
-        const { data: playersWhoHaventPicked } = await supabase
-          .from("game_players")
-          .select("id, player_name")
-          .eq("game_id", gameId)
-          .eq("has_been_category_picker", false)
-          .order("joined_at", { ascending: true })
-
-        console.log("[v0] 📊 Players who haven't picked category:", playersWhoHaventPicked?.length || 0)
-        console.log("[v0] 📊 Players who haven't picked:", playersWhoHaventPicked?.map(p => p.player_name).join(", ") || "none")
-
-        if (playersWhoHaventPicked && playersWhoHaventPicked.length > 0) {
-          // Randomly select from players who haven't picked yet
-          const randomIndex = Math.floor(Math.random() * playersWhoHaventPicked.length)
-          const selectedPlayer = playersWhoHaventPicked[randomIndex]
-          nextCategoryPickerId = selectedPlayer.id
-          nextPlayerName = selectedPlayer.player_name
-
-          // Mark this player as having been the category picker
-          await supabase
-            .from("game_players")
-            .update({ has_been_category_picker: true })
-            .eq("id", nextCategoryPickerId)
-          console.log("[v0] ✅ Marked", selectedPlayer.player_name, "as next category picker")
-        } else {
-          // Fallback: all players have picked, reset and pick randomly
-          console.log("[v0] ⚠️ All players have picked - resetting has_been_category_picker for all")
-
-          // Reset the tracking column for all players
-          await supabase
-            .from("game_players")
-            .update({ has_been_category_picker: false })
-            .eq("game_id", gameId)
-
-          // Pick a random player
-          const randomIndex = Math.floor(Math.random() * allPlayers.length)
-          nextCategoryPickerId = allPlayers[randomIndex].id
-          nextPlayerName = allPlayers[randomIndex].player_name
-
-          // Mark them as having been picked
-          await supabase
-            .from("game_players")
-            .update({ has_been_category_picker: true })
-            .eq("id", nextCategoryPickerId)
-
-          console.log("[v0] ✅ Selected", nextPlayerName, "as next category picker (after reset)")
-        }
-
-        // Reset for next round and store next category picker
-        await supabase
-          .from("games")
-          .update({
-            current_round: nextRound,
-            current_category: null,
-            current_song_player_id: null,
-            next_category_picker_id: nextCategoryPickerId,
-          })
-          .eq("id", gameId)
-
-        await supabase
-          .from("game_players")
-          .update({
-            has_selected_category: false,
-            song_played: false,
-            song_uri: null,
-            song_title: null,
-            song_artist: null,
-            song_preview_url: null,
-            album_cover_url: null,
-          })
-          .eq("game_id", gameId)
-
-        console.log("[v0] 🧹 Reset all player flags for next round")
-        console.log("[v0] 🎲 Stored next category picker ID:", nextCategoryPickerId)
-        console.log("[v0] 🎲 Stored next category picker name:", nextPlayerName)
-      } else {
-        console.log("[v0] 👥 REGULAR PLAYER: Waiting for song owner to update database")
-        // Wait for song owner to update
-        await new Promise((resolve) => setTimeout(resolve, 1500))
-
-        // Regular players read from database
-        const { data: updatedGame } = await supabase
-          .from("games")
-          .select("next_category_picker_id")
-          .eq("id", gameId)
-          .single()
-
-        if (!updatedGame || !updatedGame.next_category_picker_id) {
-          console.log("[v0] ❌ ERROR: Next category picker not set in database!")
-          console.log("[v0] ❌ updatedGame:", updatedGame)
-          isProcessingNavigation.current = false
-          return
-        }
-
-        nextCategoryPickerId = updatedGame.next_category_picker_id
-
-        // Get the player info for logging
-        const { data: nextPlayer } = await supabase
-          .from("game_players")
-          .select("player_name")
-          .eq("id", nextCategoryPickerId)
-          .single()
-
-        nextPlayerName = nextPlayer?.player_name || "Unknown"
-      }
-
-      const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
-
-      console.log("[v0] 🎲 Next turn decision:")
-      console.log("[v0] - Next category picker:", nextPlayerName)
-      console.log("[v0] - Next category picker ID:", nextCategoryPickerId)
-      console.log("[v0] - My player ID:", myPlayerId)
-      console.log("[v0] - Am I next?", myPlayerId === nextCategoryPickerId)
+      console.log("[v0] 🏆 Navigating to final placements for round", game.current_round)
 
       await new Promise((resolve) => setTimeout(resolve, 800))
 
       const timestamp = Date.now()
-
-      if (myPlayerId === nextCategoryPickerId) {
-        console.log("[v0] ✅ It's my turn to select category!")
-        router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}`)
-      } else {
-        console.log("[v0] ⏳ Waiting for", nextPlayerName, "to select category")
-        router.push(
-          `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextCategoryPickerId)}&t=${timestamp}`,
-        )
-      }
+      router.push(`/final-placements?code=${gameCode}&round=${game.current_round}&t=${timestamp}`)
+      return
     }
 
     // Poll every 2 seconds to check if ready to navigate

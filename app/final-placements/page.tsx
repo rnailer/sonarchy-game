@@ -36,11 +36,15 @@ function FinalPlacementsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const gameCode = searchParams.get("code")
+  const currentRound = parseInt(searchParams.get("round") || "1")
 
-  const [timeRemaining, setTimeRemaining] = useState(20)
+  const [timeRemaining, setTimeRemaining] = useState(10)
   const [players, setPlayers] = useState<Player[]>([])
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
+  const [gameId, setGameId] = useState<string | null>(null)
+  const [totalPlayers, setTotalPlayers] = useState(0)
+  const [currentSongPlayerId, setCurrentSongPlayerId] = useState<string | null>(null)
   const hasNavigated = useRef(false)
 
   useEffect(() => {
@@ -50,13 +54,16 @@ function FinalPlacementsContent() {
       const supabase = createClient()
       const { data: game } = await supabase
         .from("games")
-        .select("id")
+        .select("id, current_song_player_id")
         .eq("game_code", gameCode)
         .single()
 
       if (!game) return
 
-      // Get all players with their songs from all rounds
+      setGameId(game.id)
+      setCurrentSongPlayerId(game.current_song_player_id)
+
+      // Get all players
       const { data: gamePlayers } = await supabase
         .from("game_players")
         .select("*")
@@ -65,19 +72,29 @@ function FinalPlacementsContent() {
 
       if (!gamePlayers) return
 
-      // Get current player's placements
-      const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
-      const savedPlacements = localStorage.getItem(`final_placements_${gameCode}`)
-      const placements = savedPlacements ? JSON.parse(savedPlacements) : {}
+      setTotalPlayers(gamePlayers.length)
 
-      // Group songs by player (simplified - showing all songs they picked)
+      // Get current player's placements for THIS round from leaderboard_placements
+      const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+      const { data: myPlacements } = await supabase
+        .from("leaderboard_placements")
+        .select("song_player_id, placement_position")
+        .eq("game_id", game.id)
+        .eq("round_number", currentRound)
+        .eq("player_id", myPlayerId)
+
+      const placementsMap: Record<string, number> = {}
+      myPlacements?.forEach((p: any) => {
+        placementsMap[p.song_player_id] = p.placement_position
+      })
+
+      // Show players with their songs from THIS round
       const playerData: Player[] = gamePlayers.map((p, index) => {
         const songs: PlayerSong[] = []
 
-        // For now, just show their current song (we can expand this to track all rounds)
         if (p.song_title && p.song_artist) {
           songs.push({
-            round: 1, // We'll improve this to track actual rounds
+            round: currentRound,
             song_title: p.song_title,
             song_artist: p.song_artist,
           })
@@ -88,7 +105,7 @@ function FinalPlacementsContent() {
           player_name: p.player_name,
           avatar_id: p.avatar_id,
           songs,
-          placement: placements[p.id] || index + 1,
+          placement: placementsMap[p.id] || index + 1,
         }
       })
 
@@ -98,7 +115,7 @@ function FinalPlacementsContent() {
     }
 
     loadPlayers()
-  }, [gameCode])
+  }, [gameCode, currentRound])
 
   useEffect(() => {
     if (timeRemaining > 0) {
@@ -109,19 +126,184 @@ function FinalPlacementsContent() {
     }
   }, [timeRemaining])
 
-  const handleSubmit = () => {
-    if (hasNavigated.current) return
+  const handleSubmit = async () => {
+    if (hasNavigated.current || !gameCode || !gameId) return
     hasNavigated.current = true
 
-    // Save final placements
-    const placements: Record<string, number> = {}
-    players.forEach((player, index) => {
-      placements[player.id] = index + 1
-    })
-    localStorage.setItem(`final_placements_${gameCode}`, JSON.stringify(placements))
+    console.log("[v0] 🏆 Final placements submitted for round", currentRound)
 
-    // Navigate to final podium
-    router.push(`/final-results?code=${gameCode}`)
+    const supabase = createClient()
+    const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+
+    // Save updated placements to database
+    for (let i = 0; i < players.length; i++) {
+      const player = players[i]
+      const position = i + 1
+
+      if (myPlayerId) {
+        await supabase.from("leaderboard_placements").upsert({
+          game_id: gameId,
+          round_number: currentRound,
+          player_id: myPlayerId,
+          song_player_id: player.id,
+          placement_position: position,
+        })
+      }
+    }
+
+    console.log("[v0] ✅ Saved placements for round", currentRound)
+
+    // Check if game should end
+    console.log("[v0] 📊 Current round:", currentRound)
+    console.log("[v0] 📊 Total players:", totalPlayers)
+    console.log("[v0] 🔍 Game should end if:", `${currentRound} >= ${totalPlayers}`)
+
+    if (currentRound >= totalPlayers) {
+      // Game complete - go to final results
+      console.log("[v0] 🎉 GAME COMPLETE! Going to final results")
+      await new Promise((resolve) => setTimeout(resolve, 500))
+      const timestamp = Date.now()
+      router.push(`/final-results?code=${gameCode}&t=${timestamp}`)
+      return
+    }
+
+    // Game continues - prepare for next round
+    console.log("[v0] 🔄 Game continues to round", currentRound + 1)
+
+    const isSongOwner = myPlayerId === currentSongPlayerId
+    const nextRound = currentRound + 1
+
+    // Get all players
+    const { data: allPlayers } = await supabase
+      .from("game_players")
+      .select("*")
+      .eq("game_id", gameId)
+      .order("joined_at", { ascending: true })
+
+    if (!allPlayers) {
+      console.log("[v0] ❌ ERROR: Could not load players")
+      return
+    }
+
+    let nextCategoryPickerId: string
+    let nextPlayerName: string
+
+    // CRITICAL: Only song owner updates database
+    if (isSongOwner) {
+      console.log("[v0] 🎭 SONG OWNER: Setting up next round")
+
+      // Get players who haven't been category picker yet
+      const { data: playersWhoHaventPicked } = await supabase
+        .from("game_players")
+        .select("id, player_name")
+        .eq("game_id", gameId)
+        .eq("has_been_category_picker", false)
+        .order("joined_at", { ascending: true })
+
+      console.log("[v0] 📊 Players who haven't picked:", playersWhoHaventPicked?.length || 0)
+
+      if (playersWhoHaventPicked && playersWhoHaventPicked.length > 0) {
+        // Randomly select from players who haven't picked yet
+        const randomIndex = Math.floor(Math.random() * playersWhoHaventPicked.length)
+        const selectedPlayer = playersWhoHaventPicked[randomIndex]
+        nextCategoryPickerId = selectedPlayer.id
+        nextPlayerName = selectedPlayer.player_name
+
+        // Mark this player as having been the category picker
+        await supabase
+          .from("game_players")
+          .update({ has_been_category_picker: true })
+          .eq("id", nextCategoryPickerId)
+        console.log("[v0] ✅ Marked", selectedPlayer.player_name, "as next category picker")
+      } else {
+        // Fallback: all players have picked, reset and pick randomly
+        console.log("[v0] ⚠️ All players have picked - resetting")
+
+        await supabase
+          .from("game_players")
+          .update({ has_been_category_picker: false })
+          .eq("game_id", gameId)
+
+        const randomIndex = Math.floor(Math.random() * allPlayers.length)
+        nextCategoryPickerId = allPlayers[randomIndex].id
+        nextPlayerName = allPlayers[randomIndex].player_name
+
+        await supabase
+          .from("game_players")
+          .update({ has_been_category_picker: true })
+          .eq("id", nextCategoryPickerId)
+
+        console.log("[v0] ✅ Selected", nextPlayerName, "after reset")
+      }
+
+      // Reset for next round
+      await supabase
+        .from("games")
+        .update({
+          current_round: nextRound,
+          current_category: null,
+          current_song_player_id: null,
+          next_category_picker_id: nextCategoryPickerId,
+        })
+        .eq("id", gameId)
+
+      await supabase
+        .from("game_players")
+        .update({
+          has_selected_category: false,
+          song_played: false,
+          song_uri: null,
+          song_title: null,
+          song_artist: null,
+          song_preview_url: null,
+          album_cover_url: null,
+        })
+        .eq("game_id", gameId)
+
+      console.log("[v0] 🧹 Reset for round", nextRound)
+    } else {
+      console.log("[v0] 👥 REGULAR PLAYER: Waiting for song owner")
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      // Read next category picker from database
+      const { data: updatedGame } = await supabase
+        .from("games")
+        .select("next_category_picker_id")
+        .eq("id", gameId)
+        .single()
+
+      if (!updatedGame || !updatedGame.next_category_picker_id) {
+        console.log("[v0] ❌ ERROR: Next category picker not set!")
+        return
+      }
+
+      nextCategoryPickerId = updatedGame.next_category_picker_id
+
+      const { data: nextPlayer } = await supabase
+        .from("game_players")
+        .select("player_name")
+        .eq("id", nextCategoryPickerId)
+        .single()
+
+      nextPlayerName = nextPlayer?.player_name || "Unknown"
+    }
+
+    console.log("[v0] 🎲 Next category picker:", nextPlayerName)
+    console.log("[v0] 🎲 Am I next?", myPlayerId === nextCategoryPickerId)
+
+    await new Promise((resolve) => setTimeout(resolve, 800))
+
+    const timestamp = Date.now()
+
+    if (myPlayerId === nextCategoryPickerId) {
+      console.log("[v0] ✅ My turn to select category!")
+      router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}`)
+    } else {
+      console.log("[v0] ⏳ Waiting for", nextPlayerName)
+      router.push(
+        `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextCategoryPickerId)}&t=${timestamp}`,
+      )
+    }
   }
 
   const handlePlayerTap = (playerId: string) => {
@@ -173,13 +355,13 @@ function FinalPlacementsContent() {
             backgroundImage: "linear-gradient(to bottom left, #8BE1FF, #0D91EA)",
           }}
         >
-          FINAL PLACEMENTS
+          ROUND {currentRound} PLACEMENTS
         </h1>
       </header>
 
       <div className="fixed top-[140px] left-0 right-0 z-40 bg-[#000022] px-9">
         <p className="text-[14px] font-normal mb-3 text-center" style={{ color: "#B9F3FF" }}>
-          Tap to adjust your final rankings
+          Tap to adjust your rankings for this round
         </p>
 
         <div
@@ -212,7 +394,7 @@ function FinalPlacementsContent() {
               <div
                 className="h-full transition-all duration-1000"
                 style={{
-                  width: `${(timeRemaining / 20) * 100}%`,
+                  width: `${(timeRemaining / 10) * 100}%`,
                   background: "#E2A100",
                 }}
               />
@@ -321,7 +503,7 @@ function FinalPlacementsContent() {
             color: "#000033",
           }}
         >
-          Confirm Final Placements
+          Confirm Round {currentRound} Placements
         </button>
       </div>
     </div>
