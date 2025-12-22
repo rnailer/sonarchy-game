@@ -181,7 +181,7 @@ export default function FinalResults() {
           WebkitTextFillColor: "transparent",
         }}
       >
-        GAME COMPLETE!
+        FINAL PODIUM
       </h1>
 
       <div className="absolute top-20 left-10 text-4xl animate-bounce" style={{ animationDelay: "0s" }}>

@@ -318,7 +318,7 @@ export default function Leaderboard() {
         await new Promise((resolve) => setTimeout(resolve, 800))
 
         const timestamp = Date.now()
-        router.push(`/final-results?code=${gameCode}&t=${timestamp}`)
+        router.push(`/final-placements?code=${gameCode}&t=${timestamp}`)
         return
       }
 
