@@ -141,13 +141,18 @@ function FinalPlacementsContent() {
       const position = i + 1
 
       if (myPlayerId) {
-        await supabase.from("leaderboard_placements").upsert({
-          game_id: gameId,
-          round_number: currentRound,
-          player_id: myPlayerId,
-          song_player_id: player.id,
-          placement_position: position,
-        })
+        await supabase.from("leaderboard_placements").upsert(
+          {
+            game_id: gameId,
+            round_number: currentRound,
+            player_id: myPlayerId,
+            song_player_id: player.id,
+            placement_position: position,
+          },
+          {
+            onConflict: "game_id,round_number,player_id,song_player_id",
+          },
+        )
       }
     }
 
