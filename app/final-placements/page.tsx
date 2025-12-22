@@ -122,12 +122,22 @@ function FinalPlacementsContent() {
       const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
       return () => clearTimeout(timer)
     } else if (timeRemaining === 0 && !hasNavigated.current) {
+      console.log("[v0] ⏰ Timer reached 0, calling handleSubmit")
       handleSubmit()
     }
   }, [timeRemaining])
 
   const handleSubmit = async () => {
-    if (hasNavigated.current || !gameCode || !gameId) return
+    console.log("[v0] 🔍 handleSubmit called")
+    console.log("[v0] 🔍 hasNavigated:", hasNavigated.current)
+    console.log("[v0] 🔍 gameCode:", gameCode)
+    console.log("[v0] 🔍 gameId:", gameId)
+
+    if (hasNavigated.current || !gameCode || !gameId) {
+      console.log("[v0] ❌ Returning early from handleSubmit")
+      console.log("[v0] ❌ Reason: hasNavigated =", hasNavigated.current, "| gameCode =", !!gameCode, "| gameId =", !!gameId)
+      return
+    }
     hasNavigated.current = true
 
     console.log("[v0] 🏆 Final placements submitted for round", currentRound)
