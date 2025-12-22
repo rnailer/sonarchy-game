@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -32,7 +32,7 @@ interface Player {
   placement: number
 }
 
-export default function FinalPlacements() {
+function FinalPlacementsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const gameCode = searchParams.get("code")
@@ -325,5 +325,17 @@ export default function FinalPlacements() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function FinalPlacements() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center">
+        <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
+      <FinalPlacementsContent />
+    </Suspense>
   )
 }
