@@ -37,6 +37,7 @@ function FinalPlacementsContent() {
   const searchParams = useSearchParams()
   const gameCode = searchParams.get("code")
   const currentRound = parseInt(searchParams.get("round") || "1")
+  const songOwnerId = searchParams.get("songOwnerId")
 
   const [timeRemaining, setTimeRemaining] = useState(10)
   const [players, setPlayers] = useState<Player[]>([])
@@ -44,7 +45,6 @@ function FinalPlacementsContent() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
   const [totalPlayers, setTotalPlayers] = useState(0)
-  const [currentSongPlayerId, setCurrentSongPlayerId] = useState<string | null>(null)
   const hasNavigated = useRef(false)
 
   useEffect(() => {
@@ -54,14 +54,13 @@ function FinalPlacementsContent() {
       const supabase = createClient()
       const { data: game } = await supabase
         .from("games")
-        .select("id, current_song_player_id")
+        .select("id")
         .eq("game_code", gameCode)
         .single()
 
       if (!game) return
 
       setGameId(game.id)
-      setCurrentSongPlayerId(game.current_song_player_id)
 
       // Get all players
       const { data: gamePlayers } = await supabase
@@ -185,7 +184,10 @@ function FinalPlacementsContent() {
     // Game continues - prepare for next round
     console.log("[v0] 🔄 Game continues to round", currentRound + 1)
 
-    const isSongOwner = myPlayerId === currentSongPlayerId
+    const isSongOwner = myPlayerId === songOwnerId
+    console.log("[v0] 🎭 Song owner ID from URL:", songOwnerId)
+    console.log("[v0] 🎭 My player ID:", myPlayerId)
+    console.log("[v0] 🎭 Am I song owner?", isSongOwner)
     const nextRound = currentRound + 1
 
     // Get all players

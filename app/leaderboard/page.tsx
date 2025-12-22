@@ -307,11 +307,12 @@ export default function Leaderboard() {
       hasNavigated.current = true
 
       console.log("[v0] 🏆 Navigating to final placements for round", game.current_round)
+      console.log("[v0] 🎭 Song owner for this round:", currentSongPlayerId)
 
       await new Promise((resolve) => setTimeout(resolve, 800))
 
       const timestamp = Date.now()
-      router.push(`/final-placements?code=${gameCode}&round=${game.current_round}&t=${timestamp}`)
+      router.push(`/final-placements?code=${gameCode}&round=${game.current_round}&songOwnerId=${currentSongPlayerId}&t=${timestamp}`)
       return
     }
 
