@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, Suspense } from "react"
+import { useState, useEffect, useRef, Suspense, useCallback } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -138,7 +138,7 @@ function FinalPlacementsContent() {
     }
   }, [gameId, startTimer])
 
-  const handleSubmit = async () => {
+  const handleSubmit = useCallback(async () => {
     console.log("[v0] 🔍 handleSubmit called")
     console.log("[v0] 🔍 hasNavigated:", hasNavigated.current)
     console.log("[v0] 🔍 gameCode:", gameCode)
@@ -155,6 +155,12 @@ function FinalPlacementsContent() {
 
     const supabase = createClient()
     const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+
+    if (!myPlayerId) {
+      console.log("[v0] ❌ ERROR: No player ID found in localStorage!")
+      hasNavigated.current = false
+      return
+    }
 
     // Save updated placements to database
     for (let i = 0; i < players.length; i++) {
@@ -327,6 +333,12 @@ function FinalPlacementsContent() {
     console.log("[v0] 🎲 Next category picker:", nextPlayerName)
     console.log("[v0] 🎲 Am I next?", myPlayerId === nextCategoryPickerId)
 
+    // Validate navigation parameters
+    if (!nextCategoryPickerId) {
+      console.log("[v0] ❌ ERROR: nextCategoryPickerId is undefined!")
+      return
+    }
+
     await new Promise((resolve) => setTimeout(resolve, 800))
 
     const timestamp = Date.now()
@@ -340,7 +352,7 @@ function FinalPlacementsContent() {
         `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextCategoryPickerId)}&t=${timestamp}`,
       )
     }
-  }
+  }, [gameCode, gameId, currentRound, players, totalPlayers, songOwnerId, router])
 
   // Assign handleSubmit to ref so timer can call it
   useEffect(() => {

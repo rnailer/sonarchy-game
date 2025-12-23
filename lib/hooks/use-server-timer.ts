@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 
 interface UseServerTimerOptions {
   gameId: string
-  timerType: "song" | "leaderboard" | "category_selection" | "waiting" | "name_vote" | "song_selection"
+  timerType: "song" | "leaderboard" | "category_selection" | "waiting" | "name_vote" | "song_selection" | "final_placements"
   onExpire?: () => void
   enabled?: boolean
 }
@@ -25,6 +25,7 @@ const FIELD_MAP = {
   waiting: "waiting_start_time",
   name_vote: "name_vote_start_time",
   song_selection: "song_selection_start_time",
+  final_placements: "final_placements_start_time",
 } as const
 
 /**
@@ -64,6 +65,12 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
     const supabase = createClient()
     const field = FIELD_MAP[timerType]
+
+    if (!field) {
+      console.error(`[ServerTimer] Invalid timerType: ${timerType}. Must be one of: ${Object.keys(FIELD_MAP).join(', ')}`)
+      return
+    }
+
     const durationField = field.replace("_start_time", "_duration")
 
     console.log(`[ServerTimer] Using fields: ${field}, ${durationField}`)
@@ -131,6 +138,12 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
 
     const supabase = createClient()
     const field = FIELD_MAP[timerType]
+
+    if (!field) {
+      console.error(`[ServerTimer] Invalid timerType: ${timerType}. Must be one of: ${Object.keys(FIELD_MAP).join(', ')}`)
+      return
+    }
+
     const durationField = field.replace("_start_time", "_duration")
 
     let intervalId: NodeJS.Timeout | null = null
