@@ -255,6 +255,19 @@ export default function Leaderboard() {
       console.log("[v0] ✅ Marked song as played")
 
       // Step 5: Check for next unplayed song in current round (RANDOM ORDER)
+      // First, get ALL players to debug
+      const { data: allPlayersDebug } = await supabase
+        .from("game_players")
+        .select("id, player_name, song_uri, song_played, song_title")
+        .eq("game_id", gameId)
+
+      console.log("[v0] 🔍 DEBUG - ALL PLAYERS STATE:")
+      allPlayersDebug?.forEach((p) => {
+        console.log(
+          `[v0]   - ${p.player_name}: song_uri=${p.song_uri ? "SET (" + p.song_uri.substring(0, 20) + "...)" : "NULL"}, song_played=${p.song_played}, song="${p.song_title || "none"}"`,
+        )
+      })
+
       const { data: unplayedSongs } = await supabase
         .from("game_players")
         .select("id, player_name, song_title")
