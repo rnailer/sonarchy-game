@@ -348,13 +348,12 @@ export default function PlayersLockedIn() {
     }
   }, [])
 
+  // Use setInterval with elapsed time tracking for accurate countdown
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else {
+    const startTime = Date.now()
+    const initialTime = timeRemaining
+
+    if (initialTime <= 0) {
       const navigateToPlayback = async () => {
         if (!gameCode || !supabase) {
           router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
@@ -416,8 +415,21 @@ export default function PlayersLockedIn() {
       }
 
       navigateToPlayback()
+      return
     }
-  }, [timeRemaining, router, category, gameCode])
+
+    // Update timer every 100ms for smoother countdown
+    const interval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - startTime) / 1000)
+      const remaining = Math.max(0, initialTime - elapsed)
+
+      if (remaining !== timeRemaining) {
+        setTimeRemaining(remaining)
+      }
+    }, 100)
+
+    return () => clearInterval(interval)
+  }, [timeRemaining, router, category, gameCode, supabase])
 
   useEffect(() => {
     if (chatMessagesRef.current) {

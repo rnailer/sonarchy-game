@@ -507,27 +507,6 @@ function FinalPlacementsContent() {
         </div>
       </div>
 
-      <div
-        className="fixed bottom-0 left-0 right-0 z-50 flex justify-center"
-        style={{
-          background: "linear-gradient(to top, #000022 0%, rgba(0, 0, 34, 0.95) 50%, transparent 100%)",
-          paddingTop: "40px",
-          paddingBottom: "26px",
-        }}
-      >
-        <button
-          onClick={handleSubmit}
-          className="w-[calc(100%-72px)] h-[56px] text-[20px] font-bold rounded-[16px] border-2"
-          style={{
-            background: "#FFD03B",
-            border: "2px solid #FFF8C4",
-            boxShadow: "0px 4px 0px 0px #7C5100",
-            color: "#000033",
-          }}
-        >
-          Confirm Round {currentRound} Placements
-        </button>
-      </div>
     </div>
   )
 }
