@@ -456,7 +456,8 @@ export default function PlayersLockedIn() {
     return `${mins}:${secs.toString().padStart(2, "0")}`
   }
 
-  const initialTime = remainingTimeParam ? Number.parseInt(remainingTimeParam) : 10
+  // Server timer is 60 seconds (song_selection duration)
+  const initialTime = 60
   const progressPercentage = (timeRemaining / initialTime) * 100
 
   const handleSendMessage = async () => {
