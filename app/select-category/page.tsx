@@ -11,6 +11,8 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { getGameState } from "@/lib/game-state"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const ALL_PRESET_CATEGORIES = [
   { emoji: "🐾", text: "Songs with an animal in the title" },
@@ -101,17 +103,33 @@ export default function SelectCategory() {
     setDebugInfo((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`])
   }
 
+  // Phase sync for category selection
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId,
+    expectedPhase: 'category_selection',
+    disabled: !gameCode || !gameId
+  })
+
   // Server-synchronized timer
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
     gameId,
     timerType: "category_selection",
-    onExpire: () => {
+    onExpire: async () => {
       console.log("[v0] Category selection timer expired")
       if (presetCategories.length === 0) {
         console.error("[v0] No preset categories available!")
         return
       }
       const randomPreset = presetCategories[Math.floor(Math.random() * presetCategories.length)]
+
+      // NEW: Transition to song_selection phase
+      if (gameId) {
+        addDebug(`Setting phase to song_selection`)
+        await setGamePhase(gameId, 'song_selection')
+      }
+
+      // KEEP existing navigation as fallback
       const url = `/category-selected?category=${encodeURIComponent(randomPreset.text)}&code=${gameCode}`
       addDebug(`⏰ Time's up! Auto-selecting: ${randomPreset.text}`)
       router.push(url)
@@ -216,9 +234,16 @@ export default function SelectCategory() {
             await supabase.from("game_players").update({ has_selected_category: true }).eq("id", myPlayerId)
             addDebug("✅ Marked as selected")
           }
+
+          // NEW: Transition to song_selection phase
+          if (gameId) {
+            addDebug(`Setting phase to song_selection`)
+            await setGamePhase(gameId, 'song_selection')
+          }
         }
       }
 
+      // KEEP existing navigation as fallback
       router.push(`/category-selected?category=${encodeURIComponent(category)}&code=${gameCode}`)
     }
   }
