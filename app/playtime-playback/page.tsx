@@ -12,6 +12,8 @@ import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const SHOW_DEBUG = true
 
@@ -57,6 +59,14 @@ export default function PlaytimePlayback() {
   const [gameId, setGameId] = useState<string | null>(null)
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const timerStartedRef = useRef(false)
+
+  // Phase sync for playback
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId: gameId || "",
+    expectedPhase: 'playback',
+    disabled: !gameCode || !gameId
+  })
 
   // Use server-synchronized timer for voting periods
   const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
@@ -843,6 +853,14 @@ export default function PlaytimePlayback() {
 
         markSongAsPlayed()
 
+        // NEW: Transition to ranking phase - ALL players move together
+        if (gameId) {
+          addDebugLog(`🔄 Transitioning to ranking phase...`)
+          await setGamePhase(gameId, 'ranking')
+          addDebugLog(`✅ Phase transition complete - ALL players will be redirected`)
+        }
+
+        // KEEP existing navigation as fallback
         setTimeout(() => {
           router.push(
             `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&bonusPoints=${extensionCount > 0 ? 10 : 0}&code=${gameCode}&t=${Date.now()}`,
@@ -889,6 +907,14 @@ export default function PlaytimePlayback() {
 
         markSongAsPlayed()
 
+        // NEW: Transition to ranking phase - ALL players move together
+        if (gameId) {
+          addDebugLog(`🔄 Transitioning to ranking phase...`)
+          await setGamePhase(gameId, 'ranking')
+          addDebugLog(`✅ Phase transition complete - ALL players will be redirected`)
+        }
+
+        // KEEP existing navigation as fallback
         setTimeout(() => {
           router.push(
             `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&code=${gameCode}&t=${Date.now()}`,
