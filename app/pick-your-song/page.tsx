@@ -678,7 +678,7 @@ export default function PickYourSong() {
 
     console.log("[v0] 🚀 Navigating to players-locked-in page")
     router.push(
-      `/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}&remainingTime=${timeRemaining}`,
+      `/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}`,
     )
   }
 
