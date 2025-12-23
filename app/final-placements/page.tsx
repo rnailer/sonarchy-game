@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -48,6 +50,14 @@ function FinalPlacementsContent() {
   const hasNavigated = useRef(false)
   const timerStartedRef = useRef(false)
   const handleSubmitRef = useRef<() => Promise<void>>()
+
+  // Phase sync for final placements
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId: gameId || "",
+    expectedPhase: 'final_placements',
+    disabled: !gameCode || !gameId
+  })
 
   // Use server-synchronized timer for final placements
   const { timeRemaining, startTimer } = useServerTimer({
@@ -193,7 +203,17 @@ function FinalPlacementsContent() {
     if (currentRound >= totalPlayers) {
       // Game complete - go to final results
       console.log("[v0] 🎉 GAME COMPLETE! Going to final results")
+
+      // NEW: Transition to game_complete phase
+      if (gameId) {
+        console.log("[v0] 🔄 Transitioning to game_complete phase...")
+        await setGamePhase(gameId, 'game_complete')
+        console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+      }
+
       await new Promise((resolve) => setTimeout(resolve, 500))
+
+      // KEEP existing navigation as fallback
       const timestamp = Date.now()
       router.push(`/final-results?code=${gameCode}&t=${timestamp}`)
       return
@@ -341,6 +361,14 @@ function FinalPlacementsContent() {
 
     await new Promise((resolve) => setTimeout(resolve, 800))
 
+    // NEW: Transition to category_selection phase for next round
+    if (gameId) {
+      console.log("[v0] 🔄 Transitioning to category_selection phase for round", nextRound)
+      await setGamePhase(gameId, 'category_selection')
+      console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+    }
+
+    // KEEP existing navigation as fallback
     const timestamp = Date.now()
 
     if (myPlayerId === nextCategoryPickerId) {
