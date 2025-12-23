@@ -6,6 +6,8 @@ import Link from "next/link"
 import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const SHOW_DEBUG = false
 
@@ -19,6 +21,14 @@ export default function GameStarting() {
   const hasNavigated = useRef(false)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [picker, setPicker] = useState<any | null>(null)
+  const [gameId, setGameId] = useState<string>("")
+
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId,
+    expectedPhase: 'lobby',
+    disabled: !gameCode || !gameId
+  })
 
   const addDebug = (msg: string) => {
     setDebugInfo((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`])
@@ -27,6 +37,26 @@ export default function GameStarting() {
   useEffect(() => {
     addDebug(`Page loaded. GameCode: ${gameCode || "MISSING"}`)
   }, [])
+
+  useEffect(() => {
+    if (!gameCode || gameId) return
+
+    const fetchGameId = async () => {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from('games')
+        .select('id')
+        .eq('game_code', gameCode)
+        .single()
+
+      if (data?.id) {
+        setGameId(data.id)
+        addDebug(`Fetched gameId: ${data.id}`)
+      }
+    }
+
+    fetchGameId()
+  }, [gameCode, gameId])
 
   useEffect(() => {
     if (countdown > 0) {
@@ -80,6 +110,13 @@ export default function GameStarting() {
 
         addDebug(`First picker: ${firstPicker.player_name} (ID: ${firstPicker.id})`)
 
+        // NEW: Transition to category_selection phase
+        if (gameId) {
+          addDebug(`Setting phase to category_selection`)
+          await setGamePhase(gameId, 'category_selection')
+        }
+
+        // KEEP existing navigation as fallback
         if (currentPlayerId === firstPicker.id) {
           // I'm the picker - go to select category
           const url = `/select-category?code=${gameCode}&round=1&player=${currentPlayerId}`
