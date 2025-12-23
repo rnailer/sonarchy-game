@@ -18,6 +18,11 @@ Adds the `has_been_category_picker` column to the `game_players` table to track 
 ### 002_add_next_category_picker_id.sql
 Adds the `next_category_picker_id` column to the `games` table to store which player will select the category for the next round.
 
+### 003_add_final_placements_timer.sql
+Adds the `final_placements_start_time` and `final_placements_duration` columns to the `games` table for server-synchronized timer on the final placements page.
+
 ## Required for Features
 
-These migrations are **required** for the round rotation system to work properly. Without them, you'll see 400 errors when the game tries to reset between rounds.
+These migrations are **required** for the following features:
+- **001 & 002**: Round rotation system to work properly. Without them, you'll see 400 errors when the game tries to reset between rounds.
+- **003**: Server-synchronized timer on final placements page. Without it, players may experience desynced timers between rounds.

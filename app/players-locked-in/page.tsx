@@ -8,6 +8,7 @@ import Link from "next/link"
 import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const SHOW_DEBUG = false
 
@@ -67,17 +68,6 @@ export default function PlayersLockedIn() {
   const searchParams = useSearchParams()
   const category = searchParams.get("category") || "Songs about cars or driving"
   const gameCode = searchParams.get("code")
-  const remainingTimeParam = searchParams.get("remainingTime")
-
-  const [timeRemaining, setTimeRemaining] = useState(() => {
-    if (remainingTimeParam) {
-      const time = Number.parseInt(remainingTimeParam)
-      console.log("[v0] Using remaining time from pick-your-song:", time)
-      return Math.max(0, time)
-    }
-    console.log("[v0] No remaining time parameter, using default 10 seconds")
-    return 10
-  })
 
   const [isMuted, setIsMuted] = useState(false)
   const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -95,6 +85,78 @@ export default function PlayersLockedIn() {
   const [currentPlayerName, setCurrentPlayerName] = useState<string>("")
   const [currentPlayerAvatar, setCurrentPlayerAvatar] = useState<string>("")
   const supabase = createClient()
+  const hasNavigated = useRef(false)
+
+  // Use server-synchronized timer from song selection phase
+  const { timeRemaining } = useServerTimer({
+    gameId: gameId || undefined,
+    timerType: "song_selection",
+    enabled: !!gameId,
+    onExpire: async () => {
+      if (hasNavigated.current) return
+      hasNavigated.current = true
+
+      console.log("[v0] ⏰ Timer expired, navigating to playback...")
+
+      if (!gameCode || !supabase) {
+        router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
+        return
+      }
+
+      try {
+        const { data: game } = await supabase
+          .from("games")
+          .select("id, current_category, current_song_player_id")
+          .eq("game_code", gameCode)
+          .single()
+
+        if (game) {
+          // CRITICAL: If no song is currently selected, select the first song randomly
+          if (!game.current_song_player_id) {
+            console.log("[v0] 🎲 No current song set, selecting first song randomly...")
+
+            const { data: playersWithSongs } = await supabase
+              .from("game_players")
+              .select("id, player_name, song_title, song_uri, song_played")
+              .eq("game_id", game.id)
+              .not("song_uri", "is", null)
+              .eq("song_played", false)
+
+            console.log("[v0] 📊 Players with unplayed songs:", playersWithSongs?.length || 0)
+            playersWithSongs?.forEach((p) => {
+              console.log("[v0] 📊 -", p.player_name, ":", p.song_title, "(song_played:", p.song_played, ")")
+            })
+
+            if (playersWithSongs && playersWithSongs.length > 0) {
+              // Randomly select first song
+              const shuffled = playersWithSongs.sort(() => Math.random() - 0.5)
+              const firstSong = shuffled[0]
+
+              console.log("[v0] 🎵 Selected first song:", firstSong.song_title, "by", firstSong.player_name)
+
+              // Set it as current song
+              await supabase
+                .from("games")
+                .update({ current_song_player_id: firstSong.id })
+                .eq("id", game.id)
+            } else {
+              console.log("[v0] ❌ WARNING: No unplayed songs found!")
+            }
+          } else {
+            console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
+          }
+
+          const actualCategory = game.current_category || category
+          router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
+        } else {
+          router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching game category:", error)
+        router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
+      }
+    },
+  })
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(SHOW_DEBUG)
@@ -347,89 +409,6 @@ export default function PlayersLockedIn() {
       }
     }
   }, [])
-
-  // Use setInterval with elapsed time tracking for accurate countdown
-  useEffect(() => {
-    const startTime = Date.now()
-    const initialTime = timeRemaining
-
-    if (initialTime <= 0) {
-      const navigateToPlayback = async () => {
-        if (!gameCode || !supabase) {
-          router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
-          return
-        }
-
-        try {
-          const { data: game } = await supabase
-            .from("games")
-            .select("id, current_category, current_song_player_id")
-            .eq("game_code", gameCode)
-            .single()
-
-          if (game) {
-            // CRITICAL: If no song is currently selected, select the first song randomly
-            if (!game.current_song_player_id) {
-              console.log("[v0] 🎲 No current song set, selecting first song randomly...")
-
-              const { data: playersWithSongs } = await supabase
-                .from("game_players")
-                .select("id, player_name, song_title, song_uri, song_played")
-                .eq("game_id", game.id)
-                .not("song_uri", "is", null)
-                .eq("song_played", false)
-
-              console.log("[v0] 📊 Players with unplayed songs:", playersWithSongs?.length || 0)
-              playersWithSongs?.forEach((p) => {
-                console.log("[v0] 📊 -", p.player_name, ":", p.song_title, "(song_played:", p.song_played, ")")
-              })
-
-              if (playersWithSongs && playersWithSongs.length > 0) {
-                // Randomly select first song
-                const shuffled = playersWithSongs.sort(() => Math.random() - 0.5)
-                const firstSong = shuffled[0]
-
-                console.log("[v0] 🎵 Selected first song:", firstSong.song_title, "by", firstSong.player_name)
-
-                // Set it as current song
-                await supabase
-                  .from("games")
-                  .update({ current_song_player_id: firstSong.id })
-                  .eq("id", game.id)
-              } else {
-                console.log("[v0] ❌ WARNING: No unplayed songs found!")
-              }
-            } else {
-              console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
-            }
-
-            const actualCategory = game.current_category || category
-            router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
-          } else {
-            router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
-          }
-        } catch (error) {
-          console.error("[v0] Error fetching game category:", error)
-          router.push(`/playtime-playback?category=${encodeURIComponent(category)}&code=${gameCode}`)
-        }
-      }
-
-      navigateToPlayback()
-      return
-    }
-
-    // Update timer every 100ms for smoother countdown
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTime) / 1000)
-      const remaining = Math.max(0, initialTime - elapsed)
-
-      if (remaining !== timeRemaining) {
-        setTimeRemaining(remaining)
-      }
-    }, 100)
-
-    return () => clearInterval(interval)
-  }, [timeRemaining, router, category, gameCode, supabase])
 
   useEffect(() => {
     if (chatMessagesRef.current) {

@@ -11,6 +11,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import Image from "next/image"
 import { getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const SHOW_DEBUG = true
 
@@ -53,9 +54,25 @@ export default function PlaytimePlayback() {
   const [isLoadingPlayer, setIsLoadingPlayer] = useState(true)
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [gameId, setGameId] = useState<string | null>(null)
+  const timerStartedRef = useRef(false)
 
-  const [timeRemaining, setTimeRemaining] = useState(30) // Changed from 15 to 30 seconds for voting time
-  // </CHANGE>
+  // Use server-synchronized timer for voting periods
+  const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
+    gameId: gameId || undefined,
+    timerType: "song",
+    enabled: !!gameId && hasStartedPlayback,
+  })
+
+  // Use server timer value, fallback to 30 if not started yet
+  const [timeRemaining, setTimeRemaining] = useState(30)
+
+  // Sync local timer with server timer when available
+  useEffect(() => {
+    if (serverTimeRemaining !== undefined && serverTimeRemaining !== timeRemaining) {
+      setTimeRemaining(serverTimeRemaining)
+    }
+  }, [serverTimeRemaining])
 
   const [isMuted, setIsMuted] = useState(false)
   const [skipVotes, setSkipVotes] = useState(0)
@@ -174,6 +191,7 @@ export default function PlaytimePlayback() {
       }
 
       addDebugLog(`✅ Game ID: ${game.id}`)
+      setGameId(game.id) // Set gameId for server timer
       addDebugLog(`👑 Host user ID: ${game.host_user_id}`)
       addDebugLog(`🎵 Current song player ID: ${game.current_song_player_id || "NONE - need to select next song"}`)
 
@@ -775,6 +793,16 @@ export default function PlaytimePlayback() {
     addDebugLog(`🎵 Preview URL: ${playerData.song_preview_url || "MISSING"}`)
   }, [playerData]) // Removed simulatedPlaybackActive from dependencies
 
+  // Start server timer when playback begins
+  useEffect(() => {
+    if (gameId && hasStartedPlayback && !timerStartedRef.current) {
+      timerStartedRef.current = true
+      console.log("[v0] 🎬 Starting server timer for voting (30s)")
+      addDebugLog("🎬 Starting server timer for voting (30s)")
+      startServerTimer(30)
+    }
+  }, [gameId, hasStartedPlayback, startServerTimer])
+
   useEffect(() => {
     if (!hasStartedPlayback) return
 
@@ -833,6 +861,9 @@ export default function PlaytimePlayback() {
         // Extend for the next voting period (up to 30 seconds or remaining time)
         const nextRoundDuration = Math.min(30, remainingTime)
         addDebugLog(`⏱️ Extending song for ${nextRoundDuration} more seconds (Extension #${extensionCount + 1})`)
+
+        // Restart server timer with new duration
+        startServerTimer(nextRoundDuration)
 
         setTimeout(() => {
           setShowOverlay(false)

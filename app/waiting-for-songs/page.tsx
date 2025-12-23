@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
+import { useServerTimer } from "@/lib/hooks/use-server-timer";
 
 export default function WaitingForSongs() {
   const router = useRouter()
@@ -16,8 +17,21 @@ export default function WaitingForSongs() {
 
   const [playersReady, setPlayersReady] = useState(0)
   const [totalPlayers, setTotalPlayers] = useState(0)
-  const [timeRemaining, setTimeRemaining] = useState(60)
+  const [gameId, setGameId] = useState<string | null>(null)
   const hasNavigated = useRef(false)
+
+  // Use server-synchronized timer from song selection phase
+  const { timeRemaining } = useServerTimer({
+    gameId: gameId || undefined,
+    timerType: "song_selection",
+    enabled: !!gameId,
+    onExpire: () => {
+      if (hasNavigated.current) return
+      hasNavigated.current = true
+      console.log("[v0] Time's up! Navigating to name vote...")
+      router.push(`/playtime-name-vote?category=${encodeURIComponent(category || "")}&code=${gameCode}`)
+    },
+  })
 
   useEffect(() => {
     console.log("[v0] WaitingForSongs page loaded, game code:", gameCode)
@@ -35,6 +49,9 @@ export default function WaitingForSongs() {
         console.log("[v0] No game found")
         return
       }
+
+      // Set gameId for server timer
+      setGameId(game.id)
 
       // Get all players
       const { data: players } = await supabase.from("game_players").select("*").eq("game_id", game.id)
@@ -85,20 +102,6 @@ export default function WaitingForSongs() {
       supabase.removeChannel(channel)
     }
   }, [gameCode, category, supabase, router])
-
-  useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => {
-        setTimeRemaining(timeRemaining - 1)
-      }, 1000)
-      return () => clearTimeout(timer)
-    } else if (!hasNavigated.current) {
-      // Time's up, navigate anyway
-      console.log("[v0] Time's up! Navigating to name vote...")
-      hasNavigated.current = true
-      router.push(`/playtime-name-vote?category=${encodeURIComponent(category || "")}&code=${gameCode}`)
-    }
-  }, [timeRemaining, router, category, gameCode])
 
   const progressPercentage = (playersReady / totalPlayers) * 100
 

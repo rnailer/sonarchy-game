@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { ChevronDown, ChevronUp } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useServerTimer } from "@/lib/hooks/use-server-timer"
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -39,13 +40,25 @@ function FinalPlacementsContent() {
   const currentRound = parseInt(searchParams.get("round") || "1")
   const songOwnerId = searchParams.get("songOwnerId")
 
-  const [timeRemaining, setTimeRemaining] = useState(10)
   const [players, setPlayers] = useState<Player[]>([])
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
   const [totalPlayers, setTotalPlayers] = useState(0)
   const hasNavigated = useRef(false)
+  const timerStartedRef = useRef(false)
+  const handleSubmitRef = useRef<() => Promise<void>>()
+
+  // Use server-synchronized timer for final placements
+  const { timeRemaining, startTimer } = useServerTimer({
+    gameId: gameId || undefined,
+    timerType: "final_placements",
+    enabled: !!gameId,
+    onExpire: () => {
+      console.log("[v0] ⏰ Timer reached 0, calling handleSubmit")
+      handleSubmitRef.current?.()
+    },
+  })
 
   useEffect(() => {
     const loadPlayers = async () => {
@@ -116,15 +129,14 @@ function FinalPlacementsContent() {
     loadPlayers()
   }, [gameCode, currentRound])
 
+  // Start timer when page loads
   useEffect(() => {
-    if (timeRemaining > 0) {
-      const timer = setTimeout(() => setTimeRemaining(timeRemaining - 1), 1000)
-      return () => clearTimeout(timer)
-    } else if (timeRemaining === 0 && !hasNavigated.current) {
-      console.log("[v0] ⏰ Timer reached 0, calling handleSubmit")
-      handleSubmit()
+    if (gameId && !timerStartedRef.current) {
+      timerStartedRef.current = true
+      console.log("[v0] 🎬 Starting final placements timer (10s)")
+      startTimer(10)
     }
-  }, [timeRemaining])
+  }, [gameId, startTimer])
 
   const handleSubmit = async () => {
     console.log("[v0] 🔍 handleSubmit called")
@@ -266,6 +278,8 @@ function FinalPlacementsContent() {
           category_selection_duration: null,
           song_selection_start_time: null,
           song_selection_duration: null,
+          final_placements_start_time: null,
+          final_placements_duration: null,
         })
         .eq("id", gameId)
 
@@ -327,6 +341,11 @@ function FinalPlacementsContent() {
       )
     }
   }
+
+  // Assign handleSubmit to ref so timer can call it
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit
+  }, [handleSubmit])
 
   const handlePlayerTap = (playerId: string) => {
     if (selectedPlayerId === playerId) {
