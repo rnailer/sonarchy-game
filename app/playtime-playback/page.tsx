@@ -55,6 +55,7 @@ export default function PlaytimePlayback() {
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const timerStartedRef = useRef(false)
 
   // Use server-synchronized timer for voting periods
@@ -97,7 +98,6 @@ export default function PlaytimePlayback() {
   const [songEnded, setSongEnded] = useState(false)
   const [isProcessingExpiration, setIsProcessingExpiration] = useState(false)
   const [isAnimatingIn, setIsAnimatingIn] = useState(true)
-  const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const [totalElapsedTime, setTotalElapsedTime] = useState(0)
   const [spotifyAccessToken, setSpotifyAccessToken] = useState<string | null>(null)
   const [isHost, setIsHost] = useState(false)
