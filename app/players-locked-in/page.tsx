@@ -9,6 +9,8 @@ import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const SHOW_DEBUG = false
 
@@ -87,6 +89,14 @@ export default function PlayersLockedIn() {
   const supabase = createClient()
   const hasNavigated = useRef(false)
 
+  // Phase sync for players locked in
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId: gameId || "",
+    expectedPhase: 'players_locked_in',
+    disabled: !gameCode || !gameId
+  })
+
   // Use server-synchronized timer from song selection phase
   const { timeRemaining } = useServerTimer({
     gameId: gameId || undefined,
@@ -146,6 +156,14 @@ export default function PlayersLockedIn() {
             console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
           }
 
+          // NEW: Transition to playback phase
+          console.log("[v0] 🔄 Transitioning to playback phase...")
+          if (game.id) {
+            await setGamePhase(game.id, 'playback')
+            console.log("[v0] ✅ Phase transition complete - all players will be redirected")
+          }
+
+          // KEEP existing navigation as fallback
           const actualCategory = game.current_category || category
           router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
         } else {
