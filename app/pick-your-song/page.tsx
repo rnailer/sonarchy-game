@@ -9,6 +9,8 @@ import { useToast } from "@/hooks/use-toast"
 import { savePlayerData, getGameState } from "@/lib/game-state"
 import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 import { checkDuplicateSpotifyAccounts } from "@/app/actions/spotify"
 
@@ -39,6 +41,14 @@ export default function PickYourSong() {
 
   const [gameId, setGameId] = useState<string>("")
   const timerStartedRef = useRef(false)
+
+  // Phase sync for song selection
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId,
+    expectedPhase: 'song_selection',
+    disabled: !gameCode || !gameId
+  })
 
   // Server-synchronized timer
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
@@ -668,6 +678,37 @@ export default function PickYourSong() {
       return
     }
 
+    // NEW: Check if ALL players have picked their songs
+    console.log("[v0] 🔍 Checking if all players have picked songs...")
+    const { data: allPlayers, error: checkAllError } = await supabase
+      .from('game_players')
+      .select('song_uri, player_name')
+      .eq('game_id', existingPlayer.game_id)
+
+    if (checkAllError) {
+      console.error("[v0] ❌ Error checking all players:", checkAllError)
+    } else if (allPlayers) {
+      console.log("[v0] 📊 Total players:", allPlayers.length)
+      console.log("[v0] 📊 Players with songs:", allPlayers.filter(p => p.song_uri).length)
+
+      const allPicked = allPlayers.every(p => p.song_uri !== null && p.song_uri !== '')
+
+      if (allPicked) {
+        console.log("[v0] 🎉 ALL PLAYERS HAVE PICKED SONGS!")
+        console.log("[v0] 🔄 Transitioning to players_locked_in phase...")
+
+        // Transition to players_locked_in phase - this will navigate ALL players
+        if (gameId) {
+          await setGamePhase(gameId, 'players_locked_in')
+          console.log("[v0] ✅ Phase transition complete - all players will be redirected")
+        }
+      } else {
+        console.log("[v0] ⏳ Waiting for other players to pick...")
+        const unpicked = allPlayers.filter(p => !p.song_uri).map(p => p.player_name)
+        console.log("[v0] ⏳ Still waiting for:", unpicked.join(", "))
+      }
+    }
+
     setPickedSongs((prev) => new Set([...prev, selectedTrack.uri]))
 
     console.log("[v0] 🎉 Showing success toast")
@@ -676,7 +717,7 @@ export default function PickYourSong() {
       description: `${selectedTrack.name} by ${selectedTrack.artists.map((a) => a.name).join(", ")}`,
     })
 
-    // Navigate to players-locked-in (server timer handles countdown)
+    // KEEP existing navigation as fallback (phase sync will also redirect if all picked)
     console.log("[v0] 🚀 Navigating to players-locked-in page")
     router.push(
       `/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}`,
