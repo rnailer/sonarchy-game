@@ -676,6 +676,7 @@ export default function PickYourSong() {
       description: `${selectedTrack.name} by ${selectedTrack.artists.map((a) => a.name).join(", ")}`,
     })
 
+    // Navigate to players-locked-in (server timer handles countdown)
     console.log("[v0] 🚀 Navigating to players-locked-in page")
     router.push(
       `/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}`,
