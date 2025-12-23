@@ -325,7 +325,9 @@ export default function Leaderboard() {
       await new Promise((resolve) => setTimeout(resolve, 800))
 
       const timestamp = Date.now()
-      router.push(`/final-placements?code=${gameCode}&round=${game.current_round}&songOwnerId=${currentSongPlayerId}&t=${timestamp}`)
+      // Only include songOwnerId if it's not empty (prevents TypeError in final-placements)
+      const songOwnerParam = currentSongPlayerId ? `&songOwnerId=${currentSongPlayerId}` : ""
+      router.push(`/final-placements?code=${gameCode}&round=${game.current_round}${songOwnerParam}&t=${timestamp}`)
       return
     }
 
