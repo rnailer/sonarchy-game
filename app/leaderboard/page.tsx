@@ -45,6 +45,14 @@ export default function Leaderboard() {
     disabled: !gameCode || !gameId
   })
 
+  // Set phase to ranking when leaderboard loads
+  useEffect(() => {
+    if (gameId && currentPhase !== 'ranking') {
+      console.log('[v0] Setting phase to ranking on leaderboard load')
+      setGamePhase(gameId, 'ranking')
+    }
+  }, [gameId, currentPhase])
+
   const [timeRemaining, setTimeRemaining] = useState(15)
   const [showTimeUp, setShowTimeUp] = useState(false)
   const [timeUpDuration, setTimeUpDuration] = useState(0)

@@ -853,14 +853,7 @@ export default function PlaytimePlayback() {
 
         markSongAsPlayed()
 
-        // NEW: Transition to ranking phase - ALL players move together
-        if (gameId) {
-          addDebugLog(`🔄 Transitioning to ranking phase...`)
-          await setGamePhase(gameId, 'ranking')
-          addDebugLog(`✅ Phase transition complete - ALL players will be redirected`)
-        }
-
-        // KEEP existing navigation as fallback
+        // Let playback finish naturally - leaderboard will set phase when it loads
         setTimeout(() => {
           router.push(
             `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&bonusPoints=${extensionCount > 0 ? 10 : 0}&code=${gameCode}&t=${Date.now()}`,
@@ -907,14 +900,7 @@ export default function PlaytimePlayback() {
 
         markSongAsPlayed()
 
-        // NEW: Transition to ranking phase - ALL players move together
-        if (gameId) {
-          addDebugLog(`🔄 Transitioning to ranking phase...`)
-          await setGamePhase(gameId, 'ranking')
-          addDebugLog(`✅ Phase transition complete - ALL players will be redirected`)
-        }
-
-        // KEEP existing navigation as fallback
+        // Let playback finish naturally - leaderboard will set phase when it loads
         setTimeout(() => {
           router.push(
             `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&code=${gameCode}&t=${Date.now()}`,
