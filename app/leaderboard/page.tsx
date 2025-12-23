@@ -6,6 +6,8 @@ import Link from "next/link"
 import { ArrowLeft } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
+import { setGamePhase } from '@/lib/game-phases'
 
 const SHOW_DEBUG = true
 
@@ -34,6 +36,14 @@ export default function Leaderboard() {
   const [totalPlayers, setTotalPlayers] = useState(0)
   const [currentRound, setCurrentRound] = useState(1)
   const [gameId, setGameId] = useState<string | null>(null)
+
+  // Phase sync for ranking/leaderboard
+  const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
+    gameCode: gameCode || "",
+    gameId: gameId || "",
+    expectedPhase: 'ranking',
+    disabled: !gameCode || !gameId
+  })
 
   const [timeRemaining, setTimeRemaining] = useState(15)
   const [showTimeUp, setShowTimeUp] = useState(false)
@@ -287,9 +297,15 @@ export default function Leaderboard() {
         // Set next song as current (synchronized for all clients)
         await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
 
+        // NEW: Transition to playback phase for next song
+        console.log("[v0] 🔄 Transitioning to playback phase for next song...")
+        await setGamePhase(gameId, 'playback')
+        console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+
         hasNavigated.current = true
         await new Promise((resolve) => setTimeout(resolve, 500))
 
+        // KEEP existing navigation as fallback
         const timestamp = Date.now()
         router.push(
           `/playtime-playback?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&t=${timestamp}`,
@@ -322,8 +338,14 @@ export default function Leaderboard() {
       console.log("[v0] 🏆 Navigating to final placements for round", game.current_round)
       console.log("[v0] 🎭 Song owner for this round:", currentSongPlayerId)
 
+      // NEW: Transition to final_placements phase
+      console.log("[v0] 🔄 Transitioning to final_placements phase...")
+      await setGamePhase(gameId, 'final_placements')
+      console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+
       await new Promise((resolve) => setTimeout(resolve, 800))
 
+      // KEEP existing navigation as fallback
       const timestamp = Date.now()
       // Only include songOwnerId if it's not empty (prevents TypeError in final-placements)
       const songOwnerParam = currentSongPlayerId ? `&songOwnerId=${currentSongPlayerId}` : ""
