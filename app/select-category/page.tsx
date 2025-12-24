@@ -91,6 +91,8 @@ export default function SelectCategory() {
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
   const [presetCategories, setPresetCategories] = useState<typeof ALL_PRESET_CATEGORIES>([])
   const [isMuted, setIsMuted] = useState(false)
+  const [isPicker, setIsPicker] = useState<boolean>(false)
+  const [pickerName, setPickerName] = useState<string>("")
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
   const timerStartedRef = useRef(false)
@@ -150,13 +152,30 @@ export default function SelectCategory() {
 
       const { data: game } = await supabase
         .from("games")
-        .select("id, current_round, current_category")
+        .select("id, current_round, current_category, next_category_picker_id")
         .eq("game_code", gameCode)
         .single()
 
       if (game) {
         setGameId(game.id) // Set gameId for server timer
         addDebug(`📋 Round: ${game.current_round}`)
+
+        // Check if this player is the category picker
+        const isThisPlayerPicker = game.next_category_picker_id === myPlayerId
+        setIsPicker(isThisPlayerPicker)
+
+        // Fetch picker's name for display
+        if (game.next_category_picker_id) {
+          const { data: pickerPlayer } = await supabase
+            .from("game_players")
+            .select("player_name")
+            .eq("id", game.next_category_picker_id)
+            .single()
+
+          if (pickerPlayer) {
+            setPickerName(pickerPlayer.player_name)
+          }
+        }
 
         const { data: player } = await supabase
           .from("game_players")
@@ -218,6 +237,12 @@ export default function SelectCategory() {
   const progressPercentage = (timeRemaining / 60) * 100
 
   const handleLockIn = async () => {
+    // Only the picker can lock in a category
+    if (!isPicker) {
+      addDebug("⚠️ Only the category picker can select!")
+      return
+    }
+
     if (categoryInput || selectedPreset) {
       const category = categoryInput || selectedPreset || ""
       addDebug(`🔒 Locking in: ${category}`)
@@ -291,7 +316,10 @@ export default function SelectCategory() {
 
       <div className="fixed top-[120px] left-0 right-0 z-40 bg-[#000022] px-9">
         <p className="text-[14px] font-normal mb-3 text-left" style={{ color: "#B9F3FF" }}>
-          You're up first {playerName}, one minute to pick.
+          {isPicker
+            ? `You're up first ${playerName}, one minute to pick.`
+            : `Waiting for ${pickerName} to select category...`
+          }
         </p>
 
         <div
@@ -415,7 +443,7 @@ export default function SelectCategory() {
       >
         <button
           onClick={handleLockIn}
-          disabled={!categoryInput && !selectedPreset}
+          disabled={!isPicker || (!categoryInput && !selectedPreset)}
           className="w-[calc(100%-72px)] h-[56px] text-[20px] font-bold rounded-[16px] border-2 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: "#FFD03B",
@@ -424,7 +452,7 @@ export default function SelectCategory() {
             color: "#000033",
           }}
         >
-          Lock in your category
+          {isPicker ? "Lock in your category" : `Waiting for ${pickerName}...`}
         </button>
       </div>
     </div>
