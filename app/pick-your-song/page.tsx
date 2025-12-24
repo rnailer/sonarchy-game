@@ -36,10 +36,10 @@ export default function PickYourSong() {
   const searchParams = useSearchParams()
   const { toast } = useToast()
   const playerName = searchParams.get("player") || "Rich"
-  const category = searchParams.get("category") || "Songs about cars or driving"
   const gameCode = searchParams.get("code")
 
   const [gameId, setGameId] = useState<string>("")
+  const [category, setCategory] = useState<string>("Songs about cars or driving")
   const timerStartedRef = useRef(false)
 
   // Phase sync for song selection
@@ -148,9 +148,15 @@ export default function PickYourSong() {
       const supabase = createClient()
       if (!supabase) return
 
-      const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
+      const { data: game } = await supabase.from("games").select("id, current_category").eq("game_code", gameCode).single()
 
       if (game) {
+        // Set category from database (single source of truth)
+        if (game.current_category) {
+          setCategory(game.current_category)
+          console.log("[v0] 📂 Category from database:", game.current_category)
+        }
+
         const fetchSongs = async () => {
           const { data: players } = await supabase
             .from("game_players")
