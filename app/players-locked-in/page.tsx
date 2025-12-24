@@ -121,6 +121,10 @@ export default function PlayersLockedIn() {
           .single()
 
         if (game) {
+          // Set phase to playback before navigating
+          await setGamePhase(game.id, 'playback')
+          console.log("[v0] ✅ Phase set to playback")
+
           // CRITICAL: If no song is currently selected, select the first song randomly
           if (!game.current_song_player_id) {
             console.log("[v0] 🎲 No current song set, selecting first song randomly...")
@@ -156,7 +160,7 @@ export default function PlayersLockedIn() {
             console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
           }
 
-          // Navigate to playback - playback page will set phase when it loads
+          // Navigate to playback (phase already set above)
           const actualCategory = game.current_category || category
           router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
         } else {
