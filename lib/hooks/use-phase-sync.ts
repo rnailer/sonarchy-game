@@ -36,6 +36,25 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
   const [isLoading, setIsLoading] = useState(true)
   const hasCheckedPhase = useRef(false)
   const hasNavigated = useRef(false)
+  const lastPhase = useRef<GamePhase | null>(null)
+  const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  // Reset hasNavigated when we're on the correct page
+  useEffect(() => {
+    if (currentPhase === expectedPhase) {
+      console.log(`[PhaseSync] On correct page for phase ${expectedPhase}, resetting navigation guard`)
+      hasNavigated.current = false
+    }
+  }, [currentPhase, expectedPhase])
+
+  // Cleanup redirect timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimeout.current) {
+        clearTimeout(redirectTimeout.current)
+      }
+    }
+  }, [])
 
   // Check phase on mount
   useEffect(() => {
@@ -57,12 +76,22 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
       console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhase}`)
       setCurrentPhase(phase)
 
-      // If phase doesn't match, redirect
+      // If phase doesn't match, redirect with debouncing
       if (phase !== expectedPhase && !hasNavigated.current) {
-        console.log(`[PhaseSync] Phase mismatch! Redirecting from ${expectedPhase} to ${phase}`)
-        hasNavigated.current = true
-        const redirectUrl = getPageForPhase(phase, gameCode, redirectParams)
-        router.push(redirectUrl)
+        console.log(`[PhaseSync] Phase mismatch! Scheduling redirect from ${expectedPhase} to ${phase}`)
+
+        if (redirectTimeout.current) {
+          clearTimeout(redirectTimeout.current)
+        }
+
+        redirectTimeout.current = setTimeout(() => {
+          if (!hasNavigated.current && phase !== expectedPhase) {
+            console.log(`[PhaseSync] Executing redirect to ${phase}`)
+            hasNavigated.current = true
+            const redirectUrl = getPageForPhase(phase, gameCode, redirectParams)
+            router.push(redirectUrl)
+          }
+        }, 200) // 200ms debounce
       } else {
         setIsLoading(false)
       }
@@ -97,12 +126,22 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           console.log(`[PhaseSync] Phase changed to: ${newPhase}`)
           setCurrentPhase(newPhase)
 
-          // If we're on wrong page, redirect
+          // If we're on wrong page, redirect with debouncing
           if (newPhase !== expectedPhase && !hasNavigated.current) {
-            console.log(`[PhaseSync] Auto-redirecting to ${newPhase} page`)
-            hasNavigated.current = true
-            const redirectUrl = getPageForPhase(newPhase, gameCode, redirectParams)
-            router.push(redirectUrl)
+            console.log(`[PhaseSync] Phase changed, scheduling redirect to ${newPhase} page`)
+
+            if (redirectTimeout.current) {
+              clearTimeout(redirectTimeout.current)
+            }
+
+            redirectTimeout.current = setTimeout(() => {
+              if (!hasNavigated.current && newPhase !== expectedPhase) {
+                console.log(`[PhaseSync] Executing auto-redirect to ${newPhase}`)
+                hasNavigated.current = true
+                const redirectUrl = getPageForPhase(newPhase, gameCode, redirectParams)
+                router.push(redirectUrl)
+              }
+            }, 200) // 200ms debounce
           }
         }
       )
