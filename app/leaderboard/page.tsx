@@ -45,14 +45,9 @@ export default function Leaderboard() {
     disabled: !gameCode || !gameId
   })
 
-  // Set phase to ranking when leaderboard loads (only once)
-  useEffect(() => {
-    if (gameId && currentPhase !== 'ranking' && !hasSetPhaseRef.current) {
-      console.log('[v0] Setting phase to ranking on leaderboard load (one-time)')
-      setGamePhase(gameId, 'ranking')
-      hasSetPhaseRef.current = true
-    }
-  }, [gameId, currentPhase])
+  // REMOVED: Phase should be set BEFORE navigation, not on page load
+  // Pages should not set their own phase - it conflicts with phase sync
+  // Phase is set by: playback page (via timer expiration or skip vote)
 
   const [timeRemaining, setTimeRemaining] = useState(15)
   const [showTimeUp, setShowTimeUp] = useState(false)
@@ -67,7 +62,6 @@ export default function Leaderboard() {
 
   const hasNavigated = useRef(false)
   const isProcessingNavigation = useRef(false)
-  const hasSetPhaseRef = useRef(false)
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
 
