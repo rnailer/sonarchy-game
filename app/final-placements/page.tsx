@@ -309,7 +309,7 @@ function FinalPlacementsContent() {
         })
         .eq("id", gameId)
 
-      await supabase
+      const { error: resetError } = await supabase
         .from("game_players")
         .update({
           has_selected_category: false,
@@ -319,10 +319,15 @@ function FinalPlacementsContent() {
           song_artist: null,
           song_preview_url: null,
           album_cover_url: null,
+          song_duration_ms: null,
         })
         .eq("game_id", gameId)
 
-      console.log("[v0] 🧹 Reset for round", nextRound)
+      if (resetError) {
+        console.error("[v0] ❌ ERROR resetting player data:", resetError)
+      } else {
+        console.log("[v0] 🧹 Reset for round", nextRound)
+      }
     } else {
       console.log("[v0] 👥 REGULAR PLAYER: Waiting for song owner")
       await new Promise((resolve) => setTimeout(resolve, 1500))
