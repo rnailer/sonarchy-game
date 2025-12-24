@@ -391,8 +391,9 @@ export default function SelectCategory() {
               setCategoryInput(e.target.value)
               setSelectedPreset(null)
             }}
-            placeholder="Type category selection here..."
-            className="w-full text-white rounded-2xl px-4 outline-none mb-3"
+            placeholder={isPicker ? "Type category selection here..." : "Only the picker can select..."}
+            disabled={!isPicker}
+            className="w-full text-white rounded-2xl px-4 outline-none mb-3 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: "#000022",
               border: "2px solid #C7D2FF",
@@ -414,10 +415,12 @@ export default function SelectCategory() {
               <button
                 key={index}
                 onClick={() => {
+                  if (!isPicker) return // Only picker can select
                   setSelectedPreset(category.text)
                   setCategoryInput("")
                 }}
-                className="w-full p-4 rounded-2xl text-left transition-all hover:bg-[#262C87]/30"
+                disabled={!isPicker}
+                className="w-full p-4 rounded-2xl text-left transition-all hover:bg-[#262C87]/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   border: selectedPreset === category.text ? "1px solid #00E5CC" : "1px dashed #C7D2FF",
                   background: selectedPreset === category.text ? "#262C87" : "transparent",
