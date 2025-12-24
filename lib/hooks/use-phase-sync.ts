@@ -38,6 +38,7 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
   const hasNavigated = useRef(false)
   const lastPhase = useRef<GamePhase | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
+  const mountTime = useRef(Date.now())
 
   // Reset hasNavigated when we're on the correct page
   useEffect(() => {
@@ -75,6 +76,14 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
 
       console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhase}`)
       setCurrentPhase(phase)
+
+      // Grace period: Don't redirect for first 500ms after mount to allow DB propagation
+      const timeSinceMount = Date.now() - mountTime.current
+      if (timeSinceMount < 500) {
+        console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping redirect check`)
+        setIsLoading(false)
+        return
+      }
 
       // If phase doesn't match, redirect with debouncing
       if (phase !== expectedPhase && !hasNavigated.current) {
@@ -125,6 +134,13 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           const newPhase = payload.new.current_phase as GamePhase
           console.log(`[PhaseSync] Phase changed to: ${newPhase}`)
           setCurrentPhase(newPhase)
+
+          // Grace period: Don't redirect for first 500ms after mount to allow DB propagation
+          const timeSinceMount = Date.now() - mountTime.current
+          if (timeSinceMount < 500) {
+            console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
+            return
+          }
 
           // If we're on wrong page, redirect with debouncing
           if (newPhase !== expectedPhase && !hasNavigated.current) {
