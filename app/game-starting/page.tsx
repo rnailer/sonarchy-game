@@ -110,6 +110,15 @@ export default function GameStarting() {
 
         addDebug(`First picker: ${firstPicker.player_name} (ID: ${firstPicker.id})`)
 
+        // Set the category picker in database
+        if (game?.id) {
+          await supabase
+            .from("games")
+            .update({ next_category_picker_id: firstPicker.id })
+            .eq("id", game.id)
+          addDebug(`Set next_category_picker_id to ${firstPicker.id}`)
+        }
+
         // NEW: Transition to category_selection phase
         if (gameId) {
           addDebug(`Setting phase to category_selection`)
