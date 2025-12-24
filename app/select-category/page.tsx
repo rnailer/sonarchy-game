@@ -119,22 +119,42 @@ export default function SelectCategory() {
     timerType: "category_selection",
     onExpire: async () => {
       console.log("[v0] Category selection timer expired")
+
+      // Only the picker should auto-select when timer expires
+      if (!isPicker) {
+        console.log("[v0] Non-picker: waiting for picker to auto-select or phase change")
+        return
+      }
+
       if (presetCategories.length === 0) {
         console.error("[v0] No preset categories available!")
         return
       }
       const randomPreset = presetCategories[Math.floor(Math.random() * presetCategories.length)]
 
-      // NEW: Transition to song_selection phase
-      if (gameId) {
-        addDebug(`Setting phase to song_selection`)
-        await setGamePhase(gameId, 'song_selection')
-      }
+      // Auto-select category when time runs out
+      if (supabase && gameCode) {
+        const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
 
-      // KEEP existing navigation as fallback
-      const url = `/category-selected?category=${encodeURIComponent(randomPreset.text)}&code=${gameCode}`
-      addDebug(`⏰ Time's up! Auto-selecting: ${randomPreset.text}`)
-      router.push(url)
+        if (game) {
+          await supabase.from("games").update({ current_category: randomPreset.text }).eq("id", game.id)
+
+          const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+          if (myPlayerId) {
+            await supabase.from("game_players").update({
+              has_selected_category: true,
+              has_been_category_picker: true
+            }).eq("id", myPlayerId)
+          }
+
+          // Transition to song_selection phase
+          if (gameId) {
+            addDebug(`⏰ Time's up! Auto-selected: ${randomPreset.text}`)
+            await setGamePhase(gameId, 'song_selection')
+            // Phase sync will auto-redirect all players to /pick-your-song
+          }
+        }
+      }
     },
     enabled: !!gameId,
   })
