@@ -307,15 +307,10 @@ export default function Leaderboard() {
         // Set next song as current (synchronized for all clients)
         await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
 
-        // NEW: Transition to playback phase for next song
-        console.log("[v0] 🔄 Transitioning to playback phase for next song...")
-        await setGamePhase(gameId, 'playback')
-        console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
-
         hasNavigated.current = true
         await new Promise((resolve) => setTimeout(resolve, 500))
 
-        // KEEP existing navigation as fallback
+        // Navigate to playback - playback page will set phase when it loads
         const timestamp = Date.now()
         router.push(
           `/playtime-playback?category=${encodeURIComponent(selectedCategory)}&code=${gameCode}&t=${timestamp}`,

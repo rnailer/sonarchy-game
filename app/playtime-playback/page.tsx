@@ -68,6 +68,16 @@ export default function PlaytimePlayback() {
     disabled: !gameCode || !gameId
   })
 
+  // Set phase to playback when page loads (only once)
+  const hasSetPhaseRef = useRef(false)
+  useEffect(() => {
+    if (gameId && currentPhase !== 'playback' && !hasSetPhaseRef.current) {
+      console.log('[v0] Setting phase to playback on playback page load (one-time)')
+      setGamePhase(gameId, 'playback')
+      hasSetPhaseRef.current = true
+    }
+  }, [gameId, currentPhase])
+
   // Use server-synchronized timer for voting periods
   const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
     gameId: gameId || undefined,
