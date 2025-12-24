@@ -7,7 +7,9 @@ import { ArrowLeft, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { createBrowserClient } from "@supabase/ssr"
+import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
+import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
 
 interface EmojiParticle {
   id: string
@@ -58,6 +60,14 @@ export default function PlaytimeWaitingPage() {
     gameId,
     timerType: "category_selection",
     enabled: !!gameId,
+  })
+
+  // Phase sync - auto-redirect when phase changes
+  const { currentPhase, isLoading: phaseLoading } = usePhaseSync({
+    gameCode,
+    gameId,
+    expectedPhase: 'players_locked_in',
+    disabled: false,
   })
 
   const [isChatOpen, setIsChatOpen] = useState(false)
@@ -179,51 +189,9 @@ export default function PlaytimeWaitingPage() {
     }
   }, [searchParams, router])
 
-  useEffect(() => {
-    if (!gameId || !gameCode) return
-
-    console.log("[v0] 📡 Setting up real-time subscription for game:", gameId)
-
-    const channel = supabase
-      .channel(`game_updates:${gameId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "games",
-          filter: `id=eq.${gameId}`,
-        },
-        (payload) => {
-          console.log("[v0] 🔔 Game updated:", payload.new)
-          const newData = payload.new as any
-          const currentCategory = newData.current_category
-
-          if (currentCategory) {
-            console.log("[v0] ✅ Category selected! Navigating to category-selected...")
-            router.push(`/category-selected?category=${encodeURIComponent(currentCategory)}&code=${gameCode}`)
-          }
-        },
-      )
-      .subscribe()
-
-    const checkForUpdates = async () => {
-      const { data: game } = await supabase.from("games").select("current_category").eq("id", gameId).single()
-
-      if (game?.current_category) {
-        console.log("[v0] 🔄 Polling detected category selection, navigating...")
-        router.push(`/category-selected?category=${encodeURIComponent(game.current_category)}&code=${gameCode}`)
-      }
-    }
-
-    const pollInterval = setInterval(checkForUpdates, 2000)
-    checkForUpdates()
-
-    return () => {
-      supabase.removeChannel(channel)
-      clearInterval(pollInterval)
-    }
-  }, [gameId, gameCode, router, supabase])
+  // REMOVED: Manual navigation logic - now handled by usePhaseSync
+  // Phase sync will automatically redirect when phase changes from
+  // players_locked_in → song_selection
 
   async function checkGameStatus(code: string) {
     try {
