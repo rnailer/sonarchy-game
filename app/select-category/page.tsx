@@ -231,8 +231,11 @@ export default function SelectCategory() {
 
           const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
           if (myPlayerId) {
-            await supabase.from("game_players").update({ has_selected_category: true }).eq("id", myPlayerId)
-            addDebug("✅ Marked as selected")
+            await supabase.from("game_players").update({
+              has_selected_category: true,
+              has_been_category_picker: true  // Mark as having been the picker
+            }).eq("id", myPlayerId)
+            addDebug("✅ Marked as selected and as category picker")
           }
 
           // NEW: Transition to song_selection phase
