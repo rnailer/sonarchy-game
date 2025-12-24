@@ -817,9 +817,18 @@ export default function PlaytimePlayback() {
   useEffect(() => {
     if (gameId && hasStartedPlayback && !timerStartedRef.current) {
       timerStartedRef.current = true
-      console.log("[v0] 🎬 Starting server timer for voting (30s)")
-      addDebugLog("🎬 Starting server timer for voting (30s)")
-      startServerTimer(30)
+      console.log("[v0] 🎬 Starting fresh server timer for voting (30s)")
+      addDebugLog("🎬 Starting fresh server timer for voting (30s)")
+
+      // Clear any existing timer from previous song before starting fresh
+      const supabase = createClient()
+      supabase.from('games').update({
+        song_start_time: null,
+        song_duration: null
+      }).eq('id', gameId).then(() => {
+        console.log("[v0] 🧹 Cleared old timer, starting fresh 30s timer")
+        startServerTimer(30)
+      })
     }
   }, [gameId, hasStartedPlayback, startServerTimer])
 
