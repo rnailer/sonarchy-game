@@ -117,28 +117,20 @@ export default function GameStarting() {
         }
 
         // KEEP existing navigation as fallback
+        // ALL players go to select-category during category_selection phase
+        const url = `/select-category?code=${gameCode}&round=1&player=${currentPlayerId}`
         if (currentPlayerId === firstPicker.id) {
-          // I'm the picker - go to select category
-          const url = `/select-category?code=${gameCode}&round=1&player=${currentPlayerId}`
           addDebug(`I'm picker! Navigating to: ${url}`)
-          router.push(url)
         } else {
-          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(firstPicker.id)}`
-          addDebug(`Not picker. Navigating to: ${url}`)
-          router.push(url)
+          addDebug(`Not picker. Watching picker select. Navigating to: ${url}`)
         }
+        router.push(url)
       } catch (error) {
         addDebug(`Database error: ${error}. Using fallback...`)
-        // Fallback to localStorage if database fails
-        if (isHost) {
-          const url = `/select-category?code=${gameCode}&round=1&player=${currentPlayerId}`
-          addDebug(`Fallback: Host navigating to: ${url}`)
-          router.push(url)
-        } else {
-          const url = `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(picker?.id || "")}`
-          addDebug(`Fallback: Non-host navigating to: ${url}`)
-          router.push(url)
-        }
+        // Fallback: ALL players go to select-category
+        const url = `/select-category?code=${gameCode}&round=1&player=${currentPlayerId}`
+        addDebug(`Fallback: Navigating to: ${url}`)
+        router.push(url)
       }
     }
 
