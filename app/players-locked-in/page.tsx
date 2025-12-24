@@ -156,14 +156,7 @@ export default function PlayersLockedIn() {
             console.log("[v0] ✅ Current song already set:", game.current_song_player_id)
           }
 
-          // NEW: Transition to playback phase
-          console.log("[v0] 🔄 Transitioning to playback phase...")
-          if (game.id) {
-            await setGamePhase(game.id, 'playback')
-            console.log("[v0] ✅ Phase transition complete - all players will be redirected")
-          }
-
-          // KEEP existing navigation as fallback
+          // Navigate to playback - playback page will set phase when it loads
           const actualCategory = game.current_category || category
           router.push(`/playtime-playback?category=${encodeURIComponent(actualCategory)}&code=${gameCode}`)
         } else {
