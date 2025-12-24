@@ -83,6 +83,19 @@ export default function PlaytimePlayback() {
     gameId: gameId || undefined,
     timerType: "song",
     enabled: !!gameId && hasStartedPlayback,
+    onExpire: async () => {
+      addDebugLog("⏱️ Server timer expired - song playback finished")
+
+      // Only the host transitions the phase to ranking
+      // This ensures single source of truth and all players sync via phase system
+      if (isHost && gameId) {
+        addDebugLog("🎯 Host setting phase to ranking")
+        await setGamePhase(gameId, 'ranking')
+        addDebugLog("✅ Phase set to ranking - all players will be redirected by phase sync")
+      } else {
+        addDebugLog("⏳ Non-host waiting for phase change to ranking")
+      }
+    },
   })
 
   // Use server timer value, fallback to 30 if not started yet
@@ -854,29 +867,24 @@ export default function PlaytimePlayback() {
 
       addDebugLog(`🎵 Song: ${songDurationSeconds}s total, ${actualElapsedTime}s elapsed, ${remainingTime}s remaining`)
 
-      // If song has reached its natural end, always go to leaderboard
+      // If song has reached its natural end, show overlay and wait for phase sync
       if (hasReachedEnd) {
-        addDebugLog(`🎉 Song has reached its natural end! Going to leaderboard...`)
+        addDebugLog(`🎉 Song has reached its natural end! Waiting for phase transition...`)
         if (audioRef.current) {
           audioRef.current.pause()
         }
 
         // Pause Spotify if host
         if (isHost && spotifyAccessToken) {
-          pauseSpotifyPlayback(spotifyAccessToken) // Fire and forget - navigating away
+          pauseSpotifyPlayback(spotifyAccessToken)
         }
 
         setSongEnded(true)
         setShowOverlay(true)
         setVoteResult("extend")
 
-
-        // Let playback finish naturally - leaderboard will set phase when it loads
-        setTimeout(() => {
-          router.push(
-            `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&bonusPoints=${extensionCount > 0 ? 10 : 0}&code=${gameCode}&t=${Date.now()}`,
-          )
-        }, 2000)
+        // Phase sync will redirect all players to leaderboard when phase changes to 'ranking'
+        // No manual navigation needed
         return
       }
 
@@ -905,24 +913,25 @@ export default function PlaytimePlayback() {
         }, 1500)
         return
       } else {
-        // Skip - end song early
-        addDebugLog("⏭️ Song skipped by vote, going to leaderboard")
+        // Skip - end song early, set phase to ranking
+        addDebugLog("⏭️ Song skipped by vote")
         if (audioRef.current) {
           audioRef.current.pause()
         }
 
         // Pause Spotify if host
         if (isHost && spotifyAccessToken) {
-          pauseSpotifyPlayback(spotifyAccessToken) // Fire and forget - navigating away
+          pauseSpotifyPlayback(spotifyAccessToken)
         }
 
+        // Only host sets phase to ranking when skip wins
+        if (isHost && gameId) {
+          addDebugLog("🎯 Host setting phase to ranking (skipped)")
+          await setGamePhase(gameId, 'ranking')
+          addDebugLog("✅ Phase set to ranking - all players will be redirected")
+        }
 
-        // Let playback finish naturally - leaderboard will set phase when it loads
-        setTimeout(() => {
-          router.push(
-            `/leaderboard?category=${encodeURIComponent(selectedCategory)}&playerId=${playerData.id}&code=${gameCode}&t=${Date.now()}`,
-          )
-        }, 1500)
+        // Phase sync will redirect all players to leaderboard
         return
       }
       // </CHANGE>
