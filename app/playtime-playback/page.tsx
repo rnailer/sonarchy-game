@@ -870,7 +870,6 @@ export default function PlaytimePlayback() {
         setShowOverlay(true)
         setVoteResult("extend")
 
-        markSongAsPlayed()
 
         // Let playback finish naturally - leaderboard will set phase when it loads
         setTimeout(() => {
@@ -917,7 +916,6 @@ export default function PlaytimePlayback() {
           pauseSpotifyPlayback(spotifyAccessToken) // Fire and forget - navigating away
         }
 
-        markSongAsPlayed()
 
         // Let playback finish naturally - leaderboard will set phase when it loads
         setTimeout(() => {
@@ -945,21 +943,6 @@ export default function PlaytimePlayback() {
     gameCode,
   ])
 
-  const markSongAsPlayed = async () => {
-    if (!gameCode || !playerData) return
-
-    const supabase = createClient()
-    if (!supabase) return
-
-    const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
-    if (!game) return
-
-    await supabase.from("game_players").update({ song_played: true }).eq("id", playerData.id)
-
-    await supabase.from("games").update({ current_song_player_id: null }).eq("id", game.id)
-
-    addDebugLog(`✅ Marked song as played for ${playerData.player_name} and cleared current song`)
-  }
 
   useEffect(() => {
     if (!gameCode || !playerData) return
