@@ -375,10 +375,8 @@ function FinalPlacementsContent() {
       console.log("[v0] ✅ My turn to select category!")
       router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}`)
     } else {
-      console.log("[v0] ⏳ Waiting for", nextPlayerName)
-      router.push(
-        `/playtime-waiting?code=${gameCode}&choosingPlayer=${encodeURIComponent(nextCategoryPickerId)}&t=${timestamp}`,
-      )
+      console.log("[v0] ⏳ Waiting for", nextPlayerName, "to select category")
+      router.push(`/select-category?code=${gameCode}&round=${nextRound}&t=${timestamp}`)
     }
   }, [gameCode, gameId, currentRound, players, totalPlayers, songOwnerId, router])
 
