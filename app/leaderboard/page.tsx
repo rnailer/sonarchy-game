@@ -199,14 +199,20 @@ export default function Leaderboard() {
     }
 
     const determineNextStep = async () => {
-      // Don't run if we're not in ranking phase anymore
-      if (currentPhase !== 'ranking') {
-        console.log("[v0] ⚠️ Not in ranking phase, skipping determineNextStep")
+      // Don't run if we're not in ranking phase anymore (fetch fresh to avoid stale closure)
+      const supabase = createClient()
+      const { data: gameData } = await supabase
+        .from("games")
+        .select("current_phase")
+        .eq("game_code", gameCode)
+        .single()
+
+      if (gameData?.current_phase !== 'ranking') {
+        console.log("[v0] ⚠️ Not in ranking phase (current:", gameData?.current_phase, "), skipping determineNextStep")
         return
       }
 
       isProcessingNavigation.current = true
-      const supabase = createClient()
 
       const isSongOwner = currentPlayerId === currentSongPlayerId
       console.log("[v0] 🎯 === LEADERBOARD NAVIGATION LOGIC ===")
