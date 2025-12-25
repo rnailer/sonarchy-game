@@ -28,11 +28,11 @@ export default function Leaderboard() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const selectedCategory = searchParams.get("category") || ""
-  const currentSongPlayerId = searchParams.get("playerId") || ""
   const gameCode = searchParams.get("code")
   const roundComplete = searchParams.get("roundComplete") === "true"
 
   const [currentPlayerId, setCurrentPlayerId] = useState<string | null>(null)
+  const [currentSongPlayerId, setCurrentSongPlayerId] = useState<string>("")
   const [totalPlayers, setTotalPlayers] = useState(0)
   const [currentRound, setCurrentRound] = useState(1)
   const [gameId, setGameId] = useState<string | null>(null)
@@ -75,13 +75,15 @@ export default function Leaderboard() {
 
       const { data: game } = await supabase
         .from("games")
-        .select("id, current_round, total_rounds")
+        .select("id, current_round, total_rounds, current_song_player_id")
         .eq("game_code", gameCode)
         .single()
 
       if (game) {
         setGameId(game.id)
         setCurrentRound(game.current_round || 1)
+        setCurrentSongPlayerId(game.current_song_player_id || "")
+        console.log("[v0] 🎵 Current song player ID from database:", game.current_song_player_id)
 
         const { data: players } = await supabase
           .from("game_players")
