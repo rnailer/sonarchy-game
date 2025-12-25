@@ -921,7 +921,7 @@ export default function PlaytimePlayback() {
         // Only host sets phase to ranking when skip wins
         if (isHost && gameId) {
           addDebugLog("🎯 Host setting phase to ranking (skipped)")
-          await setGamePhase(gameId, 'ranking')
+          setGamePhase(gameId, 'ranking') // Fire-and-forget, no await needed
           addDebugLog("✅ Phase set to ranking - all players will be redirected")
         }
 
