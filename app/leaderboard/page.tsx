@@ -199,6 +199,12 @@ export default function Leaderboard() {
     }
 
     const determineNextStep = async () => {
+      // Don't run if we're not in ranking phase anymore
+      if (currentPhase !== 'ranking') {
+        console.log("[v0] ⚠️ Not in ranking phase, skipping determineNextStep")
+        return
+      }
+
       isProcessingNavigation.current = true
       const supabase = createClient()
 
@@ -345,9 +351,14 @@ export default function Leaderboard() {
       console.log("[v0] 🎭 Song owner for this round:", currentSongPlayerId)
 
       // NEW: Transition to final_placements phase
-      console.log("[v0] 🔄 Transitioning to final_placements phase...")
-      await setGamePhase(gameId, 'final_placements')
-      console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+      // CRITICAL: Only song owner sets phase (consistent with other pages)
+      if (isSongOwner) {
+        console.log("[v0] 🔄 SONG OWNER: Transitioning to final_placements phase...")
+        await setGamePhase(gameId, 'final_placements')
+        console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+      } else {
+        console.log("[v0] ⏳ Regular player waiting for song owner to trigger phase transition")
+      }
 
       await new Promise((resolve) => setTimeout(resolve, 800))
 
