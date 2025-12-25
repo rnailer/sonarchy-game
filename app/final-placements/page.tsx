@@ -367,10 +367,13 @@ function FinalPlacementsContent() {
     await new Promise((resolve) => setTimeout(resolve, 800))
 
     // NEW: Transition to category_selection phase for next round
-    if (gameId) {
-      console.log("[v0] 🔄 Transitioning to category_selection phase for round", nextRound)
+    // CRITICAL: Only song owner sets phase (prevents race condition with reset)
+    if (gameId && isSongOwner) {
+      console.log("[v0] 🔄 SONG OWNER: Transitioning to category_selection phase for round", nextRound)
       await setGamePhase(gameId, 'category_selection')
       console.log("[v0] ✅ Phase transition complete - ALL players will be redirected")
+    } else if (gameId) {
+      console.log("[v0] ⏳ Regular player waiting for song owner to trigger phase transition")
     }
 
     // KEEP existing navigation as fallback
