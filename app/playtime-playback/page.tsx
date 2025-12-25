@@ -83,6 +83,20 @@ export default function PlaytimePlayback() {
       // Only the host transitions the phase to ranking
       // This ensures single source of truth and all players sync via phase system
       if (isHost && gameId) {
+        // Check current phase before setting - avoid overwriting if already moved to next song
+        const supabase = createClient()
+        const { data: game } = await supabase
+          .from("games")
+          .select("current_phase")
+          .eq("id", gameId)
+          .single()
+
+        if (game?.current_phase === 'playback') {
+          addDebugLog("⚠️ Phase already playback (next song started), skipping ranking transition")
+          return
+        }
+
+        // Only set to ranking if we're still in the right phase for THIS song
         addDebugLog("🎯 Host setting phase to ranking")
         await setGamePhase(gameId, 'ranking')
         addDebugLog("✅ Phase set to ranking - all players will be redirected by phase sync")
@@ -920,8 +934,22 @@ export default function PlaytimePlayback() {
 
         // Only host sets phase to ranking when skip wins
         if (isHost && gameId) {
+          // Check current phase before setting - avoid overwriting if already moved to next song
+          const supabase = createClient()
+          const { data: game } = await supabase
+            .from("games")
+            .select("current_phase")
+            .eq("id", gameId)
+            .single()
+
+          if (game?.current_phase === 'playback') {
+            addDebugLog("⚠️ Phase already playback (next song started), skipping ranking transition")
+            return
+          }
+
+          // Only set to ranking if we're still in the right phase for THIS song
           addDebugLog("🎯 Host setting phase to ranking (skipped)")
-          setGamePhase(gameId, 'ranking') // Fire-and-forget, no await needed
+          await setGamePhase(gameId, 'ranking')
           addDebugLog("✅ Phase set to ranking - all players will be redirected")
         }
 
