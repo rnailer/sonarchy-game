@@ -327,6 +327,22 @@ function FinalPlacementsContent() {
         console.error("[v0] ❌ ERROR resetting player data:", resetError)
       } else {
         console.log("[v0] 🧹 Reset for round", nextRound)
+
+        // Verify reset worked - check player data
+        const { data: verifyPlayers } = await supabase
+          .from("game_players")
+          .select("id, player_name, song_uri, song_title, song_played")
+          .eq("game_id", gameId)
+
+        console.log("[v0] 🔍 VERIFY RESET - Player data after reset:")
+        verifyPlayers?.forEach(p => {
+          console.log(`[v0]   - ${p.player_name}: song_uri=${p.song_uri}, song_title=${p.song_title}, song_played=${p.song_played}`)
+        })
+
+        const playersWithSongs = verifyPlayers?.filter(p => p.song_uri !== null) || []
+        if (playersWithSongs.length > 0) {
+          console.error("[v0] ❌ RESET FAILED - Players still have songs:", playersWithSongs.map(p => p.player_name))
+        }
       }
     } else {
       console.log("[v0] 👥 REGULAR PLAYER: Waiting for song owner")
