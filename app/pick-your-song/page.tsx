@@ -128,6 +128,66 @@ export default function PickYourSong() {
     loadGameData()
   }, [gameCode])
 
+  // Self-reset: Clear own song data when entering song selection for a new round
+  // This fixes RLS issue where song owner can't reset other players' data
+  useEffect(() => {
+    const selfResetSongData = async () => {
+      if (!gameCode || !gameId) return
+
+      const supabase = createClient()
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      // Get current player and game round
+      const { data: player } = await supabase
+        .from("game_players")
+        .select("id, song_uri, song_played")
+        .eq("game_id", gameId)
+        .eq("user_id", user.id)
+        .single()
+
+      if (!player) return
+
+      // Get current round from game
+      const { data: game } = await supabase
+        .from("games")
+        .select("current_round")
+        .eq("id", gameId)
+        .single()
+
+      // If player has song data (from previous round), clear it
+      // This ensures clean slate for new round song selection
+      if (player.song_uri || player.song_played) {
+        console.log("[v0] 🧹 Self-resetting stale song data for round", game?.current_round)
+        console.log("[v0]   - Old song_uri:", player.song_uri)
+        console.log("[v0]   - Old song_played:", player.song_played)
+
+        const { error } = await supabase
+          .from("game_players")
+          .update({
+            song_uri: null,
+            song_title: null,
+            song_artist: null,
+            song_preview_url: null,
+            album_cover_url: null,
+            song_duration_ms: null,
+            song_played: false,
+          })
+          .eq("id", player.id)
+
+        if (error) {
+          console.error("[v0] ❌ Self-reset failed:", error)
+        } else {
+          console.log("[v0] ✅ Self-reset complete - ready for new song selection")
+        }
+      }
+    }
+
+    selfResetSongData()
+  }, [gameCode, gameId])
+
   // Start the server timer once gameId is available
   useEffect(() => {
     if (gameId && !timerStartedRef.current) {
