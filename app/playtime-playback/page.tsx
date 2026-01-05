@@ -912,6 +912,7 @@ export default function PlaytimePlayback() {
 
         setTimeout(() => {
           setShowOverlay(false)
+          setVoteResult(null)
           setTimeRemaining(nextRoundDuration)
           setSkipVotes(0)
           setExtendVotes(0)
@@ -1002,6 +1003,8 @@ export default function PlaytimePlayback() {
           .eq("player_id", myPlayerId)
 
         setUserVote(null)
+        setVoteResult(null)
+        setShowOverlay(false)
         addDebugLog("🔄 Cleared previous votes for new song")
       }
       // </CHANGE>
