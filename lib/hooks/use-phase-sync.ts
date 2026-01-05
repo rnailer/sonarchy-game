@@ -77,12 +77,21 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
       console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhase}`)
       setCurrentPhase(phase)
 
-      // Grace period: Don't redirect for first 500ms after mount to allow DB propagation
+      // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
       const timeSinceMount = Date.now() - mountTime.current
-      if (timeSinceMount < 500) {
+      const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
+      const currentIndex = phaseOrder.indexOf(phase)
+      const expectedIndex = phaseOrder.indexOf(expectedPhase)
+      const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
+
+      if (timeSinceMount < 500 && !playerIsBehind) {
         console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping redirect check`)
         setIsLoading(false)
         return
+      }
+
+      if (playerIsBehind) {
+        console.log(`[PhaseSync] Player is behind (expected: ${expectedPhase}, current: ${phase}), redirecting immediately`)
       }
 
       // If phase doesn't match, redirect with debouncing
@@ -135,11 +144,20 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           console.log(`[PhaseSync] Phase changed to: ${newPhase}`)
           setCurrentPhase(newPhase)
 
-          // Grace period: Don't redirect for first 500ms after mount to allow DB propagation
+          // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
           const timeSinceMount = Date.now() - mountTime.current
-          if (timeSinceMount < 500) {
+          const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
+          const currentIndex = phaseOrder.indexOf(newPhase)
+          const expectedIndex = phaseOrder.indexOf(expectedPhase)
+          const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
+
+          if (timeSinceMount < 500 && !playerIsBehind) {
             console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
             return
+          }
+
+          if (playerIsBehind) {
+            console.log(`[PhaseSync] Player is behind (expected: ${expectedPhase}, current: ${newPhase}), redirecting immediately`)
           }
 
           // If we're on wrong page, redirect with debouncing
