@@ -54,10 +54,90 @@ export default function PickYourSong() {
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
     gameId,
     timerType: "song_selection",
-    onExpire: () => {
+    onExpire: async () => {
       console.log("[v0] Song selection timer expired")
       if (selectedTrack) {
         handleLockIn()
+      } else {
+        // Auto-assign a random "penalty" song from the bad songs playlist
+        console.log("[v0] ⚠️ No song selected - auto-assigning penalty song from playlist")
+
+        try {
+          const supabase = createClient()
+          const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+
+          if (!myPlayerId) {
+            console.error("[v0] ❌ No player ID found")
+            return
+          }
+
+          // Get Spotify access token from database
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+            console.error("[v0] ❌ No authenticated user")
+            return
+          }
+
+          const { data: tokens } = await supabase
+            .from("spotify_tokens")
+            .select("access_token")
+            .eq("user_id", user.id)
+            .single()
+
+          if (!tokens?.access_token) {
+            console.error("[v0] ❌ No Spotify token found")
+            return
+          }
+
+          // Fetch tracks from the "bad songs" playlist
+          const playlistId = "7Hsubhrb178OIF6nPVeWJW"
+          const response = await fetch(
+            `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`,
+            {
+              headers: { Authorization: `Bearer ${tokens.access_token}` }
+            }
+          )
+
+          if (!response.ok) {
+            console.error("[v0] ❌ Failed to fetch playlist")
+            return
+          }
+
+          const data = await response.json()
+          const tracks = data.items.filter((item: any) => item.track && item.track.uri)
+
+          if (tracks.length === 0) {
+            console.error("[v0] ❌ No tracks in playlist")
+            return
+          }
+
+          // Pick a random track
+          const randomItem = tracks[Math.floor(Math.random() * tracks.length)]
+          const track = randomItem.track
+
+          console.log("[v0] 🎲 Selected penalty song:", track.name, "by", track.artists[0]?.name)
+
+          // Save to database
+          const { error } = await supabase
+            .from("game_players")
+            .update({
+              song_uri: track.uri,
+              song_title: track.name,
+              song_artist: track.artists.map((a: any) => a.name).join(", "),
+              song_preview_url: track.preview_url || null,
+              album_cover_url: track.album?.images?.[0]?.url || null,
+              song_duration_ms: track.duration_ms || 180000,
+            })
+            .eq("id", myPlayerId)
+
+          if (error) {
+            console.error("[v0] ❌ Failed to save penalty song:", error)
+          } else {
+            console.log("[v0] ✅ Auto-assigned penalty song:", track.name)
+          }
+        } catch (err) {
+          console.error("[v0] ❌ Error auto-assigning song:", err)
+        }
       }
     },
     enabled: !!gameId,
