@@ -89,12 +89,12 @@ export default function PlayersLockedIn() {
   const supabase = createClient()
   const hasNavigated = useRef(false)
 
-  // Phase sync - allow both song_selection (waiting) and players_locked_in (ready)
+  // Phase sync - accept both song_selection (waiting) and players_locked_in (ready)
   // Players arrive here after locking in, but phase is still song_selection until everyone picks
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
     gameCode: gameCode || "",
     gameId: gameId || "",
-    expectedPhase: 'song_selection',
+    expectedPhase: ['song_selection', 'players_locked_in'],
     disabled: !gameCode || !gameId
   })
 
