@@ -88,7 +88,7 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
       const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
       const currentIndex = phaseOrder.indexOf(phase)
       const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
-      const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
+      const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
 
       if (timeSinceMount < 500 && !playerIsBehind) {
         console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping redirect check`)
@@ -159,7 +159,7 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
           const currentIndex = phaseOrder.indexOf(newPhase)
           const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
-          const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
+          const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
 
           if (timeSinceMount < 500 && !playerIsBehind) {
             console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
