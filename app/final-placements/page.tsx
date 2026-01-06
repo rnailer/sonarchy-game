@@ -40,7 +40,8 @@ function FinalPlacementsContent() {
   const searchParams = useSearchParams()
   const gameCode = searchParams.get("code")
   const currentRound = parseInt(searchParams.get("round") || "1")
-  const songOwnerId = searchParams.get("songOwnerId")
+  const songOwnerIdFromUrl = searchParams.get("songOwnerId")
+  const [songOwnerId, setSongOwnerId] = useState<string | null>(songOwnerIdFromUrl)
 
   const [players, setPlayers] = useState<Player[]>([])
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
@@ -138,6 +139,30 @@ function FinalPlacementsContent() {
 
     loadPlayers()
   }, [gameCode, currentRound])
+
+  // Fetch song owner from database if not in URL (PhaseSync redirects don't preserve URL params)
+  useEffect(() => {
+    const fetchSongOwner = async () => {
+      if (!songOwnerId && gameId) {
+        console.log("[v0] 🎭 No songOwnerId in URL, fetching from database...")
+        const supabase = createClient()
+        const { data: game } = await supabase
+          .from("games")
+          .select("current_song_player_id")
+          .eq("id", gameId)
+          .single()
+
+        if (game?.current_song_player_id) {
+          console.log("[v0] 🎭 Fetched song owner from DB:", game.current_song_player_id)
+          setSongOwnerId(game.current_song_player_id)
+        } else {
+          console.log("[v0] 🎭 No song owner in DB either - using host as fallback")
+          // Could fallback to host here if needed
+        }
+      }
+    }
+    fetchSongOwner()
+  }, [gameId, songOwnerId])
 
   // Start timer when page loads
   useEffect(() => {
