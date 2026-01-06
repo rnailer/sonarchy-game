@@ -160,6 +160,10 @@ export default function PlayersLockedIn() {
               }
 
               console.log("[v0] ✅ All penalty songs assigned")
+
+              // Small delay to ensure database writes propagate
+              await new Promise(resolve => setTimeout(resolve, 500))
+              console.log("[v0] ⏳ Waited 500ms for database sync")
             }
           }
 
