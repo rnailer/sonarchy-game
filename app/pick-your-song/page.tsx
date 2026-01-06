@@ -73,11 +73,11 @@ export default function PickYourSong() {
 
           // Hardcoded fallback penalty songs (used when Spotify unavailable)
           const fallbackSongs = [
-            { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b273f24f4655e51f32ba7f59e5c8" },
-            { uri: "spotify:track:6mhjmoLBND00zWIGh2G7PT", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b273dfcc7def5cb18a0c9dea3115" },
-            { uri: "spotify:track:2eWvG2lV7sHCpfBhHdXrMj", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2730d6e3e0dd4c3b5c7c8f1f1c1" },
-            { uri: "spotify:track:5ByAIlEEnxYdvpnezg7HTX", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273a79d2f8e9e4d0e2e5c7f3c1a" },
-            { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273b0f8c8b8e0e5f2f1a3b4c5d6" },
+            { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315b2e5f0e2b7c99e3c2e7d5a" },
+            { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
+            { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
+            { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
+            { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273c5c02c35eb5ea7fdd7c337b7" },
           ]
 
           // Helper function to assign fallback song
@@ -880,11 +880,11 @@ export default function PickYourSong() {
         console.log("[v0] ⏰ Timer expired - assigning penalty songs to players who didn't pick")
 
         const fallbackSongs = [
-          { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b273f24f4655e51f32ba7f59e5c8" },
-          { uri: "spotify:track:6mhjmoLBND00zWIGh2G7PT", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b273dfcc7def5cb18a0c9dea3115" },
-          { uri: "spotify:track:2eWvG2lV7sHCpfBhHdXrMj", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2730d6e3e0dd4c3b5c7c8f1f1c1" },
-          { uri: "spotify:track:5ByAIlEEnxYdvpnezg7HTX", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273a79d2f8e9e4d0e2e5c7f3c1a" },
-          { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273b0f8c8b8e0e5f2f1a3b4c5d6" },
+          { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315b2e5f0e2b7c99e3c2e7d5a" },
+          { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
+          { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
+          { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
+          { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273c5c02c35eb5ea7fdd7c337b7" },
         ]
 
         for (const player of playersWithoutSongs) {
