@@ -861,19 +861,53 @@ export default function PickYourSong() {
     console.log("[v0] 🔍 Checking if all players have picked songs...")
     const { data: allPlayers, error: checkAllError } = await supabase
       .from('game_players')
-      .select('song_uri, player_name')
+      .select('id, song_uri, player_name')
       .eq('game_id', existingPlayer.game_id)
 
     if (checkAllError) {
       console.error("[v0] ❌ Error checking all players:", checkAllError)
     } else if (allPlayers) {
+      const playersWithSongs = allPlayers.filter(p => p.song_uri !== null && p.song_uri !== '')
+      const playersWithoutSongs = allPlayers.filter(p => !p.song_uri || p.song_uri === '')
+      const allPicked = playersWithoutSongs.length === 0
+
       console.log("[v0] 📊 Total players:", allPlayers.length)
-      console.log("[v0] 📊 Players with songs:", allPlayers.filter(p => p.song_uri).length)
+      console.log("[v0] 📊 Players with songs:", playersWithSongs.length)
+      console.log("[v0] 📊 Players WITHOUT songs:", playersWithoutSongs.length)
 
-      const allPicked = allPlayers.every(p => p.song_uri !== null && p.song_uri !== '')
+      // If timer expired and some players don't have songs, assign penalty songs
+      if (isExpired && playersWithoutSongs.length > 0) {
+        console.log("[v0] ⏰ Timer expired - assigning penalty songs to players who didn't pick")
 
-      if (allPicked) {
-        console.log("[v0] 🎉 ALL PLAYERS HAVE PICKED SONGS!")
+        const fallbackSongs = [
+          { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b273f24f4655e51f32ba7f59e5c8" },
+          { uri: "spotify:track:6mhjmoLBND00zWIGh2G7PT", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b273dfcc7def5cb18a0c9dea3115" },
+          { uri: "spotify:track:2eWvG2lV7sHCpfBhHdXrMj", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2730d6e3e0dd4c3b5c7c8f1f1c1" },
+          { uri: "spotify:track:5ByAIlEEnxYdvpnezg7HTX", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273a79d2f8e9e4d0e2e5c7f3c1a" },
+          { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273b0f8c8b8e0e5f2f1a3b4c5d6" },
+        ]
+
+        for (const player of playersWithoutSongs) {
+          const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
+          console.log("[v0] 🎲 Assigning penalty song to", player.player_name, ":", randomFallback.name)
+
+          await supabase
+            .from("game_players")
+            .update({
+              song_uri: randomFallback.uri,
+              song_title: randomFallback.name,
+              song_artist: randomFallback.artist,
+              song_preview_url: null,
+              album_cover_url: randomFallback.albumCover,
+              song_duration_ms: 180000,
+            })
+            .eq("id", player.id)
+        }
+      }
+
+      // Proceed if all picked OR timer expired (after assigning penalties)
+      if (allPicked || isExpired) {
+        console.log("[v0] 🎉 ALL PLAYERS HAVE SONGS - proceeding to playback!")
         console.log("[v0] 🔄 Transitioning to players_locked_in phase...")
 
         // Transition to players_locked_in phase - this will navigate ALL players
