@@ -122,7 +122,48 @@ export default function PlayersLockedIn() {
           .single()
 
         if (game) {
-          // Set phase to playback before navigating
+          // Assign penalty songs to any players who still don't have songs
+          const { data: allPlayers } = await supabase
+            .from('game_players')
+            .select('id, song_uri, player_name')
+            .eq('game_id', game.id)
+
+          if (allPlayers) {
+            const playersWithoutSongs = allPlayers.filter(p => !p.song_uri || p.song_uri === '')
+
+            if (playersWithoutSongs.length > 0) {
+              console.log("[v0] ⚠️ Assigning penalty songs before playback:", playersWithoutSongs.map(p => p.player_name))
+
+              const fallbackSongs = [
+                { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315b2e5f0e2b7c99e3c2e7d5a" },
+                { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
+                { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
+                { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
+                { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273c5c02c35eb5ea7fdd7c337b7" },
+              ]
+
+              for (const player of playersWithoutSongs) {
+                const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
+                console.log("[v0] 🎲 Assigning penalty to", player.player_name, ":", randomFallback.name)
+
+                await supabase
+                  .from("game_players")
+                  .update({
+                    song_uri: randomFallback.uri,
+                    song_title: randomFallback.name,
+                    song_artist: randomFallback.artist,
+                    song_preview_url: null,
+                    album_cover_url: randomFallback.albumCover,
+                    song_duration_ms: 180000,
+                  })
+                  .eq("id", player.id)
+              }
+
+              console.log("[v0] ✅ All penalty songs assigned")
+            }
+          }
+
+          // Now transition to playback
           await setGamePhase(game.id, 'playback')
           console.log("[v0] ✅ Phase set to playback")
 
