@@ -16,7 +16,7 @@ import { GamePhase, getCurrentPhase, getPageForPhase, PAGE_TO_PHASE } from '@/li
 interface UsePhaseSyncOptions {
   gameCode: string
   gameId: string | null
-  expectedPhase: GamePhase
+  expectedPhase: GamePhase | GamePhase[]
   /** Additional params to include when redirecting */
   redirectParams?: Record<string, string>
   /** Disable sync (for debugging) */
@@ -42,8 +42,10 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
 
   // Reset hasNavigated when we're on the correct page
   useEffect(() => {
-    if (currentPhase === expectedPhase) {
-      console.log(`[PhaseSync] On correct page for phase ${expectedPhase}, resetting navigation guard`)
+    const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
+    const isOnValidPhase = expectedPhases.includes(currentPhase as GamePhase)
+    if (isOnValidPhase) {
+      console.log(`[PhaseSync] On correct page for phase ${currentPhase}, resetting navigation guard`)
       hasNavigated.current = false
     }
   }, [currentPhase, expectedPhase])
@@ -74,14 +76,18 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
         return
       }
 
-      console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhase}`)
+      const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
+      const primaryExpectedPhase = expectedPhases[0]
+      const isOnValidPhase = expectedPhases.includes(phase)
+
+      console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhases.join(' or ')}`)
       setCurrentPhase(phase)
 
       // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
       const timeSinceMount = Date.now() - mountTime.current
       const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
       const currentIndex = phaseOrder.indexOf(phase)
-      const expectedIndex = phaseOrder.indexOf(expectedPhase)
+      const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
       const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
 
       if (timeSinceMount < 500 && !playerIsBehind) {
@@ -91,19 +97,19 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
       }
 
       if (playerIsBehind) {
-        console.log(`[PhaseSync] Player is behind (expected: ${expectedPhase}, current: ${phase}), redirecting immediately`)
+        console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${phase}), redirecting immediately`)
       }
 
-      // If phase doesn't match, redirect with debouncing
-      if (phase !== expectedPhase && !hasNavigated.current) {
-        console.log(`[PhaseSync] Phase mismatch! Scheduling redirect from ${expectedPhase} to ${phase}`)
+      // If phase doesn't match any expected phase, redirect with debouncing
+      if (!isOnValidPhase && !hasNavigated.current) {
+        console.log(`[PhaseSync] Phase mismatch! Scheduling redirect from ${expectedPhases.join('/')} to ${phase}`)
 
         if (redirectTimeout.current) {
           clearTimeout(redirectTimeout.current)
         }
 
         redirectTimeout.current = setTimeout(() => {
-          if (!hasNavigated.current && phase !== expectedPhase) {
+          if (!hasNavigated.current && !isOnValidPhase) {
             console.log(`[PhaseSync] Executing redirect to ${phase}`)
             hasNavigated.current = true
             const redirectUrl = getPageForPhase(phase, gameCode, redirectParams)
@@ -141,6 +147,10 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           if (!isSubscribed) return
 
           const newPhase = payload.new.current_phase as GamePhase
+          const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
+          const primaryExpectedPhase = expectedPhases[0]
+          const isOnValidPhase = expectedPhases.includes(newPhase)
+
           console.log(`[PhaseSync] Phase changed to: ${newPhase}`)
           setCurrentPhase(newPhase)
 
@@ -148,7 +158,7 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           const timeSinceMount = Date.now() - mountTime.current
           const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
           const currentIndex = phaseOrder.indexOf(newPhase)
-          const expectedIndex = phaseOrder.indexOf(expectedPhase)
+          const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
           const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0
 
           if (timeSinceMount < 500 && !playerIsBehind) {
@@ -157,11 +167,11 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
           }
 
           if (playerIsBehind) {
-            console.log(`[PhaseSync] Player is behind (expected: ${expectedPhase}, current: ${newPhase}), redirecting immediately`)
+            console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${newPhase}), redirecting immediately`)
           }
 
           // If we're on wrong page, redirect with debouncing
-          if (newPhase !== expectedPhase && !hasNavigated.current) {
+          if (!isOnValidPhase && !hasNavigated.current) {
             console.log(`[PhaseSync] Phase changed, scheduling redirect to ${newPhase} page`)
 
             if (redirectTimeout.current) {
@@ -169,7 +179,7 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
             }
 
             redirectTimeout.current = setTimeout(() => {
-              if (!hasNavigated.current && newPhase !== expectedPhase) {
+              if (!hasNavigated.current && !isOnValidPhase) {
                 console.log(`[PhaseSync] Executing auto-redirect to ${newPhase}`)
                 hasNavigated.current = true
                 const redirectUrl = getPageForPhase(newPhase, gameCode, redirectParams)
@@ -189,7 +199,9 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
     }
   }, [gameId, gameCode, expectedPhase, disabled, redirectParams, router])
 
-  const isCorrectPhase = currentPhase === expectedPhase
+  const isCorrectPhase = Array.isArray(expectedPhase)
+    ? expectedPhase.includes(currentPhase as GamePhase)
+    : currentPhase === expectedPhase
 
   return {
     currentPhase,
