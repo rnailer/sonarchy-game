@@ -135,7 +135,7 @@ export default function PlayersLockedIn() {
               console.log("[v0] ⚠️ Assigning penalty songs before playback:", playersWithoutSongs.map(p => p.player_name))
 
               const fallbackSongs = [
-                { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315b2e5f0e2b7c99e3c2e7d5a" },
+                { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
                 { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
                 { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
                 { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
