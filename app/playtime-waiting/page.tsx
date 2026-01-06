@@ -62,11 +62,12 @@ export default function PlaytimeWaitingPage() {
     enabled: !!gameId,
   })
 
-  // Phase sync - auto-redirect when phase changes
+  // Phase sync - allow both song_selection (waiting) and players_locked_in (ready)
+  // Players arrive here after locking in, but phase is still song_selection until everyone picks
   const { currentPhase, isLoading: phaseLoading } = usePhaseSync({
     gameCode,
     gameId,
-    expectedPhase: 'players_locked_in',
+    expectedPhase: 'song_selection',
     disabled: false,
   })
 

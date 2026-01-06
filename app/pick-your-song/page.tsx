@@ -931,9 +931,9 @@ export default function PickYourSong() {
     })
 
     // KEEP existing navigation as fallback (phase sync will also redirect if all picked)
-    console.log("[v0] 🚀 Navigating to players-locked-in page")
+    console.log("[v0] 🚀 Navigating to playtime-waiting page")
     router.push(
-      `/players-locked-in?category=${encodeURIComponent(category)}&code=${gameCode || ""}`,
+      `/playtime-waiting?category=${encodeURIComponent(category)}&code=${gameCode || ""}`,
     )
   }
 
