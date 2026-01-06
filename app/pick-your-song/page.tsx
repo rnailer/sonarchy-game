@@ -67,37 +67,22 @@ export default function PickYourSong() {
           const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
 
           if (!myPlayerId) {
-            console.error("[v0] ❌ No player ID found")
+            console.error("[v0] ❌ No player ID found - cannot assign penalty song")
             return
           }
 
-          // Get Spotify access token from database
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) {
-            console.error("[v0] ❌ No authenticated user")
-            return
-          }
+          // Hardcoded fallback penalty songs (used when Spotify unavailable)
+          const fallbackSongs = [
+            { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b273f24f4655e51f32ba7f59e5c8" },
+            { uri: "spotify:track:6mhjmoLBND00zWIGh2G7PT", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b273dfcc7def5cb18a0c9dea3115" },
+            { uri: "spotify:track:2eWvG2lV7sHCpfBhHdXrMj", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2730d6e3e0dd4c3b5c7c8f1f1c1" },
+            { uri: "spotify:track:5ByAIlEEnxYdvpnezg7HTX", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273a79d2f8e9e4d0e2e5c7f3c1a" },
+            { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273b0f8c8b8e0e5f2f1a3b4c5d6" },
+          ]
 
-          const { data: tokens } = await supabase
-            .from("spotify_tokens")
-            .select("access_token")
-            .eq("user_id", user.id)
-            .single()
-
-          if (!tokens?.access_token) {
-            console.log("[v0] ⚠️ No Spotify token - using hardcoded fallback songs")
-
-            // Hardcoded fallback penalty songs (no API needed)
-            const fallbackSongs = [
-              { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b273f24f4655e51f32ba7f59e5c8" },
-              { uri: "spotify:track:6mhjmoLBND00zWIGh2G7PT", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b273dfcc7def5cb18a0c9dea3115" },
-              { uri: "spotify:track:2eWvG2lV7sHCpfBhHdXrMj", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2730d6e3e0dd4c3b5c7c8f1f1c1" },
-              { uri: "spotify:track:5ByAIlEEnxYdvpnezg7HTX", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273a79d2f8e9e4d0e2e5c7f3c1a" },
-              { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273b0f8c8b8e0e5f2f1a3b4c5d6" },
-            ]
-
+          // Helper function to assign fallback song
+          const assignFallbackSong = async (playerId: string) => {
             const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
-
             const { error } = await supabase
               .from("game_players")
               .update({
@@ -108,13 +93,32 @@ export default function PickYourSong() {
                 album_cover_url: randomFallback.albumCover,
                 song_duration_ms: 180000,
               })
-              .eq("id", myPlayerId)
+              .eq("id", playerId)
 
             if (error) {
               console.error("[v0] ❌ Failed to save fallback song:", error)
             } else {
               console.log("[v0] ✅ Auto-assigned fallback penalty song:", randomFallback.name)
             }
+          }
+
+          // Get Spotify access token from database
+          const { data: { user } } = await supabase.auth.getUser()
+          if (!user) {
+            console.log("[v0] ⚠️ No authenticated user - using fallback songs")
+            await assignFallbackSong(myPlayerId)
+            return
+          }
+
+          const { data: tokens } = await supabase
+            .from("spotify_tokens")
+            .select("access_token")
+            .eq("user_id", user.id)
+            .single()
+
+          if (!tokens?.access_token) {
+            console.log("[v0] ⚠️ No Spotify token - using fallback songs")
+            await assignFallbackSong(myPlayerId)
             return
           }
 
