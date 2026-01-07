@@ -64,23 +64,29 @@ export default function PickYourSong() {
     gameId,
     timerType: "song_selection",
     onExpire: async () => {
-      console.log("[v0] Song selection timer expired")
-      if (selectedTrack) {
-        handleLockIn()
-      } else {
-        // Auto-assign a random "penalty" song from the bad songs playlist
-        console.log("[v0] ⚠️ No song selected - auto-assigning penalty song from playlist")
+      console.log("[v0] ⏰ Song selection timer expired - checking ALL players for penalties")
 
-        try {
-          const supabase = createClient()
-          const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
+      try {
+        const supabase = createClient()
 
-          if (!myPlayerId) {
-            console.error("[v0] ❌ No player ID found - cannot assign penalty song")
-            return
-          }
+        // CRITICAL: Check ALL players, not just current player
+        const { data: allPlayers } = await supabase
+          .from('game_players')
+          .select('id, song_uri, player_name')
+          .eq('game_id', gameId)
 
-          // Hardcoded fallback penalty songs (used when Spotify unavailable)
+        if (!allPlayers) {
+          console.error("[v0] ❌ Failed to fetch players")
+          return
+        }
+
+        const playersWithoutSongs = allPlayers.filter(p => !p.song_uri || p.song_uri === '')
+        console.log("[v0] 📊 Players without songs:", playersWithoutSongs.length, "/", allPlayers.length)
+
+        if (playersWithoutSongs.length > 0) {
+          console.log("[v0] 🎯 Assigning penalty songs to ALL players without selections...")
+
+          // Hardcoded fallback penalty songs
           const fallbackSongs = [
             { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
             { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b27311723f2867f29b2134ae47e4" },
@@ -89,10 +95,12 @@ export default function PickYourSong() {
             { uri: "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273dac64e1520920139583dd07a" },
           ]
 
-          // Helper function to assign fallback song
-          const assignFallbackSong = async (playerId: string) => {
+          // Assign penalty to ALL players without songs
+          for (const player of playersWithoutSongs) {
             const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
-            const { error } = await supabase
+            console.log("[v0] 🎲 Assigning penalty to", player.player_name, ":", randomFallback.name)
+
+            await supabase
               .from("game_players")
               .update({
                 song_uri: randomFallback.uri,
@@ -103,98 +111,18 @@ export default function PickYourSong() {
                 song_duration_ms: 180000,
                 song_played: false,
               })
-              .eq("id", playerId)
-
-            if (error) {
-              console.error("[v0] ❌ Failed to save fallback song:", error)
-            } else {
-              console.log("[v0] ✅ Auto-assigned fallback penalty song:", randomFallback.name)
-            }
+              .eq("id", player.id)
           }
 
-          // Get Spotify access token from database
-          const { data: { user } } = await supabase.auth.getUser()
-          if (!user) {
-            console.log("[v0] ⚠️ No authenticated user - using fallback songs")
-            await assignFallbackSong(myPlayerId)
-            // Don't return - continue to phase check
-          } else {
-            const { data: tokens } = await supabase
-              .from("spotify_tokens")
-              .select("access_token")
-              .eq("user_id", user.id)
-              .single()
-
-            if (!tokens?.access_token) {
-              console.log("[v0] ⚠️ No Spotify token - using fallback songs")
-              await assignFallbackSong(myPlayerId)
-              // Don't return - continue to phase check
-            } else {
-
-          // Fetch tracks from the "bad songs" playlist
-          const playlistId = "7Hsubhrb178OIF6nPVeWJW"
-          const response = await fetch(
-            `https://api.spotify.com/v1/playlists/${playlistId}/tracks?limit=50`,
-            {
-              headers: { Authorization: `Bearer ${tokens.access_token}` }
-            }
-          )
-
-              if (!response.ok) {
-                console.error("[v0] ❌ Failed to fetch playlist")
-              } else {
-                const data = await response.json()
-                const tracks = data.items.filter((item: any) => item.track && item.track.uri)
-
-                if (tracks.length > 0) {
-                  // Pick a random track
-                  const randomItem = tracks[Math.floor(Math.random() * tracks.length)]
-                  const track = randomItem.track
-
-                  console.log("[v0] 🎲 Selected penalty song:", track.name, "by", track.artists[0]?.name)
-
-                  // Save to database
-                  const { error } = await supabase
-                    .from("game_players")
-                    .update({
-                      song_uri: track.uri,
-                      song_title: track.name,
-                      song_artist: track.artists.map((a: any) => a.name).join(", "),
-                      song_preview_url: track.preview_url || null,
-                      album_cover_url: track.album?.images?.[0]?.url || null,
-                      song_duration_ms: track.duration_ms || 180000,
-                    })
-                    .eq("id", myPlayerId)
-
-                  if (error) {
-                    console.error("[v0] ❌ Failed to save penalty song:", error)
-                  } else {
-                    console.log("[v0] ✅ Auto-assigned penalty song:", track.name)
-                  }
-                }
-              }
-            }
-          }
-
-          // After assigning penalty song, check if we should transition phase
-          console.log("[v0] 🔄 Checking if all players have songs after penalty assignment...")
-          const { data: allPlayers } = await supabase
-            .from('game_players')
-            .select('id, song_uri, player_name')
-            .eq('game_id', gameId)
-
-          if (allPlayers) {
-            const playersWithoutSongs = allPlayers.filter(p => !p.song_uri || p.song_uri === '')
-            console.log("[v0] 📊 Players still without songs:", playersWithoutSongs.length)
-
-            if (playersWithoutSongs.length === 0) {
-              console.log("[v0] 🎉 All players have songs! Transitioning to players_locked_in...")
-              await setGamePhase(gameId, 'players_locked_in')
-            }
-          }
-        } catch (err) {
-          console.error("[v0] ❌ Error auto-assigning song:", err)
+          console.log("[v0] ✅ All penalties assigned - transitioning to players_locked_in...")
+          await setGamePhase(gameId, 'players_locked_in')
+        } else {
+          // All players have songs, proceed normally
+          console.log("[v0] ✅ All players have songs - transitioning to players_locked_in...")
+          await setGamePhase(gameId, 'players_locked_in')
         }
+      } catch (err) {
+        console.error("[v0] ❌ Error in timer expiry handler:", err)
       }
     },
     enabled: !!gameId,
