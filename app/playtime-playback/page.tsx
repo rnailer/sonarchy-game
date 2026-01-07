@@ -57,7 +57,7 @@ export default function PlaytimePlayback() {
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
-  const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
+  const hasStartedPlaybackRef = useRef(false)
   const timerStartedRef = useRef(false)
 
   // Phase sync for playback
@@ -76,13 +76,13 @@ export default function PlaytimePlayback() {
   const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
     gameId: gameId || undefined,
     timerType: "song",
-    enabled: !!gameId && hasStartedPlayback,
+    enabled: !!gameId && hasStartedPlaybackRef.current,
     onExpire: async () => {
       addDebugLog("⏱️ Server timer expired - song playback finished")
 
       // CRITICAL: Only transition to ranking if playback has actually started
       // This prevents premature phase transitions on page load
-      if (!hasStartedPlayback) {
+      if (!hasStartedPlaybackRef.current) {
         addDebugLog("⚠️ Timer expired but playback hasn't started - ignoring")
         return
       }
@@ -368,8 +368,16 @@ export default function PlaytimePlayback() {
       addDebugLog(`🎵 Preview URL from DB: ${selectedPlayer.song_preview_url || "NULL/MISSING"}`)
 
       // SET this as the current song so all players are synchronized
-      await supabase.from("games").update({ current_song_player_id: selectedPlayer.id }).eq("id", game.id)
-      addDebugLog(`✅ Set current_song_player_id to ${selectedPlayer.id} - ALL PLAYERS SYNCHRONIZED!`)
+      // CRITICAL: Only the host should update current_song_player_id to prevent race conditions
+      const { data: { user: currentUser } } = await supabase.auth.getUser()
+      const userIsHost = currentUser && game.host_user_id === currentUser.id
+
+      if (userIsHost) {
+        await supabase.from("games").update({ current_song_player_id: selectedPlayer.id }).eq("id", game.id)
+        addDebugLog(`✅ HOST: Set current_song_player_id to ${selectedPlayer.id} - ALL PLAYERS SYNCHRONIZED!`)
+      } else {
+        addDebugLog(`⏳ NON-HOST: Waiting for host to set current_song_player_id`)
+      }
       // </CHANGE>
 
       if (!selectedPlayer.song_preview_url) {
@@ -748,7 +756,7 @@ export default function PlaytimePlayback() {
   const handleStartPlayback = async () => {
     addDebugLog("🎮 === USER CLICKED START MUSIC ===")
     setNeedsUserInteraction(false)
-    setHasStartedPlayback(true)
+    hasStartedPlaybackRef.current = true
     setIsAnimatingIn(false)
 
     // If user is host and Spotify is ready, start Spotify playback
@@ -875,7 +883,7 @@ export default function PlaytimePlayback() {
 
     console.log("[v0] ⏱️ Starting playback timer...")
     addDebugLog("⏱️ Starting playback timer...")
-    setHasStartedPlayback(true)
+    hasStartedPlaybackRef.current = true
     setIsAnimatingIn(false)
 
     console.log("[v0] Player data:", playerData)
@@ -887,7 +895,7 @@ export default function PlaytimePlayback() {
 
   // Start server timer when playback begins
   useEffect(() => {
-    if (gameId && hasStartedPlayback && !timerStartedRef.current) {
+    if (gameId && hasStartedPlaybackRef.current && !timerStartedRef.current) {
       timerStartedRef.current = true
       console.log("[v0] 🎬 Starting fresh server timer for voting (30s)")
       addDebugLog("🎬 Starting fresh server timer for voting (30s)")
@@ -902,10 +910,10 @@ export default function PlaytimePlayback() {
         startServerTimer(30)
       })
     }
-  }, [gameId, hasStartedPlayback, startServerTimer])
+  }, [gameId, startServerTimer])
 
   useEffect(() => {
-    if (!hasStartedPlayback) return
+    if (!hasStartedPlaybackRef.current) return
 
     if (timeRemaining > 0 && !songEnded) {
       const timer = setTimeout(() => {
@@ -1023,7 +1031,6 @@ export default function PlaytimePlayback() {
     extensionCount,
     songEnded,
     isProcessingExpiration,
-    hasStartedPlayback,
     isAnimatingIn,
     gameCode,
   ])
