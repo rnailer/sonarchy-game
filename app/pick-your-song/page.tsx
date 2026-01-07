@@ -16,6 +16,15 @@ import { checkDuplicateSpotifyAccounts } from "@/app/actions/spotify"
 
 const SHOW_DEBUG = false
 
+// Penalty song URIs - don't reset these songs
+const PENALTY_SONG_URIS = [
+  "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", // Never Gonna Give You Up
+  "spotify:track:5ygDXis42ncn6kYG14lEVG", // Baby Shark
+  "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", // Friday
+  "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", // MMMBop
+  "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", // Barbie Girl
+]
+
 interface SpotifyTrack {
   id: string
   name: string
@@ -288,6 +297,12 @@ export default function PickYourSong() {
       // If player has song data (from previous round), clear it
       // This ensures clean slate for new round song selection
       if (player.song_uri || player.song_played) {
+        // Don't reset penalty songs - they were just assigned
+        if (player.song_uri && PENALTY_SONG_URIS.includes(player.song_uri)) {
+          console.log("[v0] 🎯 Skipping reset - player has penalty song:", player.song_uri)
+          return
+        }
+
         console.log("[v0] 🧹 Self-resetting stale song data for round", game?.current_round)
         console.log("[v0]   - Old song_uri:", player.song_uri)
         console.log("[v0]   - Old song_played:", player.song_played)

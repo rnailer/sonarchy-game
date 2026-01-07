@@ -1149,6 +1149,65 @@ export default function PlaytimePlayback() {
     }
   }, [gameCode, playerData])
 
+  // Pause Spotify when game ends
+  useEffect(() => {
+    if (!gameId) return
+
+    const supabase = createClient()
+
+    // Check current phase on mount
+    const checkGameComplete = async () => {
+      const { data: game } = await supabase
+        .from("games")
+        .select("current_phase")
+        .eq("id", gameId)
+        .single()
+
+      if (game?.current_phase === "game_complete" || game?.current_phase === "final_placements") {
+        console.log("[v0] 🛑 Game ended - pausing Spotify")
+        const token = localStorage.getItem("spotify_access_token")
+        if (token) {
+          try {
+            await fetch("https://api.spotify.com/v1/me/player/pause", {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${token}` }
+            })
+          } catch (e) {
+            console.log("[v0] Could not pause Spotify:", e)
+          }
+        }
+      }
+    }
+
+    checkGameComplete()
+
+    // Subscribe to phase changes
+    const channel = supabase
+      .channel(`game-complete-${gameId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'games',
+        filter: `id=eq.${gameId}`
+      }, (payload) => {
+        if (payload.new.current_phase === "game_complete" || payload.new.current_phase === "final_placements") {
+          console.log("[v0] 🛑 Game complete detected - pausing Spotify")
+          const token = localStorage.getItem("spotify_access_token")
+          if (token) {
+            fetch("https://api.spotify.com/v1/me/player/pause", {
+              method: "PUT",
+              headers: { Authorization: `Bearer ${token}` }
+            }).catch(() => {})
+          }
+        }
+      })
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [gameId])
+
   useEffect(() => {
     if (chatMessagesRef.current) {
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight
