@@ -315,6 +315,13 @@ export default function Leaderboard() {
         // Set next song as current (synchronized for all clients)
         await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
 
+        // CRITICAL: Clear old timer before starting next song
+        console.log("[v0] 🧹 Clearing old timer for next song...")
+        await supabase.from("games").update({
+          song_start_time: null,
+          song_duration: null
+        }).eq("id", gameId)
+
         // Set phase to playback BEFORE navigating
         console.log("[v0] 🔄 Setting phase to playback for next song...")
         await setGamePhase(gameId, 'playback')
