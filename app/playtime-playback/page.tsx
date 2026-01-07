@@ -281,49 +281,7 @@ export default function PlaytimePlayback() {
       }
       // </CHANGE>
 
-      // SAFETY NET: Check for players without songs and assign penalties BEFORE playback starts
-      const { data: allPlayersCheck } = await supabase
-        .from("game_players")
-        .select("*")
-        .eq("game_id", game.id)
-
-      if (allPlayersCheck) {
-        const playersWithoutSongs = allPlayersCheck.filter(p => !p.song_uri || p.song_uri === '')
-        if (playersWithoutSongs.length > 0) {
-          addDebugLog(`⚠️ PLAYBACK PAGE: Found ${playersWithoutSongs.length} players without songs, assigning penalties: ${playersWithoutSongs.map(p => p.player_name).join(', ')}`)
-
-          const fallbackSongs = [
-            { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
-            { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b27311723f2867f29b2134ae47e4" },
-            { uri: "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2733589de3ede5dabf351227be9" },
-            { uri: "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273184227f002623fc19f44551a" },
-            { uri: "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273dac64e1520920139583dd07a" },
-          ]
-
-          for (const player of playersWithoutSongs) {
-            const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
-            addDebugLog(`🎲 PLAYBACK: Assigning penalty to ${player.player_name}: ${randomFallback.name}`)
-
-            await supabase
-              .from("game_players")
-              .update({
-                song_uri: randomFallback.uri,
-                song_title: randomFallback.name,
-                song_artist: randomFallback.artist,
-                song_preview_url: null,
-                album_cover_url: randomFallback.albumCover,
-                song_duration_ms: 180000,
-                song_played: false,
-              })
-              .eq("id", player.id)
-          }
-
-          addDebugLog(`✅ All ${playersWithoutSongs.length} penalty songs assigned on playback page`)
-
-          // Small delay to ensure database writes propagate
-          await new Promise(resolve => setTimeout(resolve, 300))
-        }
-      }
+      // Players without songs will be skipped during playback
 
       const { data: allPlayers, error: allPlayersError } = await supabase
         .from("game_players")

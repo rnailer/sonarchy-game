@@ -16,15 +16,6 @@ import { checkDuplicateSpotifyAccounts } from "@/app/actions/spotify"
 
 const SHOW_DEBUG = false
 
-// Penalty song URIs - don't reset these songs
-const PENALTY_SONG_URIS = [
-  "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", // Never Gonna Give You Up
-  "spotify:track:5ygDXis42ncn6kYG14lEVG", // Baby Shark
-  "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", // Friday
-  "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", // MMMBop
-  "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", // Barbie Girl
-]
-
 interface SpotifyTrack {
   id: string
   name: string
@@ -64,66 +55,8 @@ export default function PickYourSong() {
     gameId,
     timerType: "song_selection",
     onExpire: async () => {
-      console.log("[v0] ⏰ Song selection timer expired - checking ALL players for penalties")
-
-      try {
-        const supabase = createClient()
-
-        // CRITICAL: Check ALL players, not just current player
-        const { data: allPlayers } = await supabase
-          .from('game_players')
-          .select('id, song_uri, player_name')
-          .eq('game_id', gameId)
-
-        if (!allPlayers) {
-          console.error("[v0] ❌ Failed to fetch players")
-          return
-        }
-
-        const playersWithoutSongs = allPlayers.filter(p => !p.song_uri || p.song_uri === '')
-        console.log("[v0] 📊 Players without songs:", playersWithoutSongs.length, "/", allPlayers.length)
-
-        if (playersWithoutSongs.length > 0) {
-          console.log("[v0] 🎯 Assigning penalty songs to ALL players without selections...")
-
-          // Hardcoded fallback penalty songs
-          const fallbackSongs = [
-            { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
-            { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b27311723f2867f29b2134ae47e4" },
-            { uri: "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2733589de3ede5dabf351227be9" },
-            { uri: "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273184227f002623fc19f44551a" },
-            { uri: "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273dac64e1520920139583dd07a" },
-          ]
-
-          // Assign penalty to ALL players without songs
-          for (const player of playersWithoutSongs) {
-            const randomFallback = fallbackSongs[Math.floor(Math.random() * fallbackSongs.length)]
-            console.log("[v0] 🎲 Assigning penalty to", player.player_name, ":", randomFallback.name)
-
-            await supabase
-              .from("game_players")
-              .update({
-                song_uri: randomFallback.uri,
-                song_title: randomFallback.name,
-                song_artist: randomFallback.artist,
-                song_preview_url: null,
-                album_cover_url: randomFallback.albumCover,
-                song_duration_ms: 180000,
-                song_played: false,
-              })
-              .eq("id", player.id)
-          }
-
-          console.log("[v0] ✅ All penalties assigned - transitioning to players_locked_in...")
-          await setGamePhase(gameId, 'players_locked_in')
-        } else {
-          // All players have songs, proceed normally
-          console.log("[v0] ✅ All players have songs - transitioning to players_locked_in...")
-          await setGamePhase(gameId, 'players_locked_in')
-        }
-      } catch (err) {
-        console.error("[v0] ❌ Error in timer expiry handler:", err)
-      }
+      console.log("[v0] ⏰ Song selection timer expired")
+      await setGamePhase(gameId, 'players_locked_in')
     },
     enabled: !!gameId,
   })
@@ -225,13 +158,6 @@ export default function PickYourSong() {
       // If player has song data (from previous round), clear it
       // This ensures clean slate for new round song selection
       if (player.song_uri || player.song_played) {
-        // Don't reset penalty songs that haven't been played yet (just assigned for current round)
-        // But DO reset penalty songs that were already played (from previous round)
-        if (player.song_uri && PENALTY_SONG_URIS.includes(player.song_uri) && !player.song_played) {
-          console.log("[v0] 🎯 Skipping reset - player has unplayed penalty song for current round:", player.song_uri)
-          return
-        }
-
         console.log("[v0] 🧹 Self-resetting stale song data for round", game?.current_round)
         console.log("[v0]   - Old song_uri:", player.song_uri)
         console.log("[v0]   - Old song_played:", player.song_played)
