@@ -13,6 +13,18 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { GamePhase, getCurrentPhase, getPageForPhase, PAGE_TO_PHASE } from '@/lib/game-phases'
 
+// Phase ordering - prevents backwards navigation (except for legitimate round resets)
+const PHASE_ORDER: GamePhase[] = [
+  'lobby',
+  'category_selection',
+  'song_selection',
+  'players_locked_in',
+  'playback',
+  'ranking',
+  'final_placements',
+  'game_complete'
+]
+
 interface UsePhaseSyncOptions {
   gameCode: string
   gameId: string | null
@@ -85,10 +97,10 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
 
       // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
       const timeSinceMount = Date.now() - mountTime.current
-      const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
-      const currentIndex = phaseOrder.indexOf(phase)
-      const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
+      const currentIndex = PHASE_ORDER.indexOf(phase)
+      const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
       const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+      const playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
 
       if (timeSinceMount < 500 && !playerIsBehind) {
         console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping redirect check`)
@@ -96,8 +108,16 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
         return
       }
 
+      // CRITICAL: Never redirect backwards unless it's a legitimate round reset
+      // Only redirect forward (player is behind) or to valid phases
+      if (playerIsAhead) {
+        console.log(`[PhaseSync] ⚠️ Player is AHEAD (expected: ${primaryExpectedPhase}, current: ${phase}) - NOT redirecting backwards`)
+        setIsLoading(false)
+        return
+      }
+
       if (playerIsBehind) {
-        console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${phase}), redirecting immediately`)
+        console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${phase}), redirecting forward`)
       }
 
       // If phase doesn't match any expected phase, redirect with debouncing
@@ -156,18 +176,25 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
 
           // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
           const timeSinceMount = Date.now() - mountTime.current
-          const phaseOrder = ['lobby', 'category_selection', 'song_selection', 'players_locked_in', 'playback', 'ranking', 'final_placements', 'game_complete']
-          const currentIndex = phaseOrder.indexOf(newPhase)
-          const expectedIndex = phaseOrder.indexOf(primaryExpectedPhase)
+          const currentIndex = PHASE_ORDER.indexOf(newPhase)
+          const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
           const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+          const playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
 
           if (timeSinceMount < 500 && !playerIsBehind) {
             console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
             return
           }
 
+          // CRITICAL: Never redirect backwards unless it's a legitimate round reset
+          // Only redirect forward (player is behind) or to valid phases
+          if (playerIsAhead) {
+            console.log(`[PhaseSync] ⚠️ Player is AHEAD (expected: ${primaryExpectedPhase}, current: ${newPhase}) - NOT redirecting backwards`)
+            return
+          }
+
           if (playerIsBehind) {
-            console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${newPhase}), redirecting immediately`)
+            console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${newPhase}), redirecting forward`)
           }
 
           // If we're on wrong page, redirect with debouncing
