@@ -92,6 +92,7 @@ export default function PickYourSong() {
                 song_preview_url: null,
                 album_cover_url: randomFallback.albumCover,
                 song_duration_ms: 180000,
+                song_played: false,
               })
               .eq("id", playerId)
 
@@ -914,6 +915,7 @@ export default function PickYourSong() {
               song_preview_url: null,
               album_cover_url: randomFallback.albumCover,
               song_duration_ms: 180000,
+              song_played: false,
             })
             .eq("id", player.id)
         }
