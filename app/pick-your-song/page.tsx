@@ -74,10 +74,10 @@ export default function PickYourSong() {
           // Hardcoded fallback penalty songs (used when Spotify unavailable)
           const fallbackSongs = [
             { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
-            { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
-            { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
-            { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
-            { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273c5c02c35eb5ea7fdd7c337b7" },
+            { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b27311723f2867f29b2134ae47e4" },
+            { uri: "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2733589de3ede5dabf351227be9" },
+            { uri: "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273184227f002623fc19f44551a" },
+            { uri: "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273dac64e1520920139583dd07a" },
           ]
 
           // Helper function to assign fallback song
@@ -895,10 +895,10 @@ export default function PickYourSong() {
 
         const fallbackSongs = [
           { uri: "spotify:track:4PTG3Z6ehGkBFwjybzWkR8", name: "Never Gonna Give You Up", artist: "Rick Astley", albumCover: "https://i.scdn.co/image/ab67616d0000b27315ebbedaacef61af244262a8" },
-          { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b2736e7461d86fb10175ba970892" },
-          { uri: "spotify:track:4fK6E2UywZTJIa5kWnCD6x", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b273a1c37f3fd969287c03482c3b" },
-          { uri: "spotify:track:1dzGjJMBgq1adiFnBDLSsV", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b27389e4ad584e39ad1f9b06b866" },
-          { uri: "spotify:track:2HbKqm4o0w5wEeEFXm2sD4", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273c5c02c35eb5ea7fdd7c337b7" },
+          { uri: "spotify:track:5ygDXis42ncn6kYG14lEVG", name: "Baby Shark", artist: "Pinkfong", albumCover: "https://i.scdn.co/image/ab67616d0000b27311723f2867f29b2134ae47e4" },
+          { uri: "spotify:track:1KEdF3FNF9bKRCxN3KUMbx", name: "Friday", artist: "Rebecca Black", albumCover: "https://i.scdn.co/image/ab67616d0000b2733589de3ede5dabf351227be9" },
+          { uri: "spotify:track:0lnxrQAd9ZxbhBBe7d8FO8", name: "MMMBop", artist: "Hanson", albumCover: "https://i.scdn.co/image/ab67616d0000b273184227f002623fc19f44551a" },
+          { uri: "spotify:track:6SIDRn0OX4I8sGsDa4eCOZ", name: "Barbie Girl", artist: "Aqua", albumCover: "https://i.scdn.co/image/ab67616d0000b273dac64e1520920139583dd07a" },
         ]
 
         for (const player of playersWithoutSongs) {
