@@ -297,9 +297,10 @@ export default function PickYourSong() {
       // If player has song data (from previous round), clear it
       // This ensures clean slate for new round song selection
       if (player.song_uri || player.song_played) {
-        // Don't reset penalty songs - they were just assigned
-        if (player.song_uri && PENALTY_SONG_URIS.includes(player.song_uri)) {
-          console.log("[v0] 🎯 Skipping reset - player has penalty song:", player.song_uri)
+        // Don't reset penalty songs that haven't been played yet (just assigned for current round)
+        // But DO reset penalty songs that were already played (from previous round)
+        if (player.song_uri && PENALTY_SONG_URIS.includes(player.song_uri) && !player.song_played) {
+          console.log("[v0] 🎯 Skipping reset - player has unplayed penalty song for current round:", player.song_uri)
           return
         }
 

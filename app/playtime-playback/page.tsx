@@ -57,6 +57,7 @@ export default function PlaytimePlayback() {
   const [retryCount, setRetryCount] = useState(0)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
+  const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const timerStartedRef = useRef(false)
 
@@ -76,7 +77,7 @@ export default function PlaytimePlayback() {
   const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
     gameId: gameId || undefined,
     timerType: "song",
-    enabled: !!gameId && hasStartedPlaybackRef.current,
+    enabled: !!gameId && hasStartedPlayback,
     onExpire: async () => {
       addDebugLog("⏱️ Server timer expired - song playback finished")
 
@@ -756,6 +757,7 @@ export default function PlaytimePlayback() {
   const handleStartPlayback = async () => {
     addDebugLog("🎮 === USER CLICKED START MUSIC ===")
     setNeedsUserInteraction(false)
+    setHasStartedPlayback(true)
     hasStartedPlaybackRef.current = true
     setIsAnimatingIn(false)
 
@@ -883,6 +885,7 @@ export default function PlaytimePlayback() {
 
     console.log("[v0] ⏱️ Starting playback timer...")
     addDebugLog("⏱️ Starting playback timer...")
+    setHasStartedPlayback(true)
     hasStartedPlaybackRef.current = true
     setIsAnimatingIn(false)
 
@@ -895,7 +898,7 @@ export default function PlaytimePlayback() {
 
   // Start server timer when playback begins
   useEffect(() => {
-    if (gameId && hasStartedPlaybackRef.current && !timerStartedRef.current) {
+    if (gameId && hasStartedPlayback && !timerStartedRef.current) {
       timerStartedRef.current = true
       console.log("[v0] 🎬 Starting fresh server timer for voting (30s)")
       addDebugLog("🎬 Starting fresh server timer for voting (30s)")
@@ -910,10 +913,10 @@ export default function PlaytimePlayback() {
         startServerTimer(30)
       })
     }
-  }, [gameId, startServerTimer])
+  }, [gameId, hasStartedPlayback, startServerTimer])
 
   useEffect(() => {
-    if (!hasStartedPlaybackRef.current) return
+    if (!hasStartedPlayback) return
 
     if (timeRemaining > 0 && !songEnded) {
       const timer = setTimeout(() => {
@@ -1031,6 +1034,7 @@ export default function PlaytimePlayback() {
     extensionCount,
     songEnded,
     isProcessingExpiration,
+    hasStartedPlayback,
     isAnimatingIn,
     gameCode,
   ])
