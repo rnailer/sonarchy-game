@@ -61,6 +61,7 @@ export default function PlayersLockedIn() {
   const [isHost, setIsHost] = useState(false)
   const [hostName, setHostName] = useState("")
   const [isStarting, setIsStarting] = useState(false)
+  const [timerExpired, setTimerExpired] = useState(false)
   const supabase = createClient()
 
   // Phase sync
@@ -71,11 +72,15 @@ export default function PlayersLockedIn() {
     disabled: !gameCode || !gameId
   })
 
-  // Timer display only (no auto-transition)
+  // Timer with expiry callback
   const { timeRemaining } = useServerTimer({
     gameId: gameId || undefined,
     timerType: "song_selection",
     enabled: !!gameId,
+    onExpire: () => {
+      console.log("[v0] Timer expired - enabling Start Playback button")
+      setTimerExpired(true)
+    }
   })
 
   useEffect(() => {
@@ -292,7 +297,12 @@ export default function PlayersLockedIn() {
             <p className="text-white/70 text-sm mb-2">
               {playersWithSongs}/{totalPlayers} players selected songs
             </p>
-            {!isHost && hostName && (
+            {!timerExpired && hostName && (
+              <p className="text-white/70 text-sm">
+                Waiting for timer to finish...
+              </p>
+            )}
+            {timerExpired && !isHost && hostName && (
               <p className="text-white/70 text-sm">
                 Waiting for {hostName} to start playback...
               </p>
@@ -324,21 +334,14 @@ export default function PlayersLockedIn() {
                         className="w-10 h-10 object-contain"
                       />
                     </div>
-                    <div>
-                      <span
-                        className="text-[18px] font-semibold text-white block"
-                        style={{
-                          textShadow: `2px 2px 0px ${colorSet.shadow}`,
-                        }}
-                      >
-                        {player.player_name}
-                      </span>
-                      {player.has_song && player.song_title && (
-                        <span className="text-[12px] text-white/80 block">
-                          {player.song_title}
-                        </span>
-                      )}
-                    </div>
+                    <span
+                      className="text-[18px] font-semibold text-white"
+                      style={{
+                        textShadow: `2px 2px 0px ${colorSet.shadow}`,
+                      }}
+                    >
+                      {player.player_name}
+                    </span>
                   </div>
                   <div>
                     {player.has_song ? (
@@ -353,7 +356,7 @@ export default function PlayersLockedIn() {
           </div>
         </div>
 
-        {isHost && (
+        {isHost && timerExpired && (
           <div className="absolute bottom-0 left-0 right-0 p-6 bg-[#0D113B]">
             <Button
               onClick={handleStartPlayback}
