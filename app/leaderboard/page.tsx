@@ -279,8 +279,14 @@ export default function Leaderboard() {
       console.log("[v0] ✅ All players have ranked! Proceeding...")
 
       // Step 4: Mark current song as played (single source of truth)
-      await supabase.from("game_players").update({ song_played: true }).eq("id", currentSongPlayerId)
-      console.log("[v0] ✅ Marked song as played")
+      // CRITICAL: Only song owner should mark to prevent race conditions
+      if (isSongOwner) {
+        console.log("[v0] 🎭 SONG OWNER: Marking song as played for ID:", currentSongPlayerId)
+        await supabase.from("game_players").update({ song_played: true }).eq("id", currentSongPlayerId)
+        console.log("[v0] ✅ Marked song as played")
+      } else {
+        console.log("[v0] ⏳ NON-OWNER: Skipping mark song_played (only song owner does this)")
+      }
 
       // Step 5: Check for next unplayed song in current round (RANDOM ORDER)
       // First, get ALL players to debug
@@ -312,20 +318,28 @@ export default function Leaderboard() {
         // More songs to play in this round (RANDOM ORDER)
         console.log("[v0] ➡️ Moving to next song (random):", shuffledSongs[0].song_title)
 
-        // Set next song as current (synchronized for all clients)
-        await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
+        // CRITICAL: Only song owner should update database to prevent race conditions
+        if (isSongOwner) {
+          console.log("[v0] 🎭 SONG OWNER: Setting next song as current")
+          // Set next song as current (synchronized for all clients)
+          await supabase.from("games").update({ current_song_player_id: shuffledSongs[0].id }).eq("id", gameId)
 
-        // CRITICAL: Clear old timer before starting next song
-        console.log("[v0] 🧹 Clearing old timer for next song...")
-        await supabase.from("games").update({
-          song_start_time: null,
-          song_duration: null
-        }).eq("id", gameId)
+          // CRITICAL: Clear old timer before starting next song
+          console.log("[v0] 🧹 Clearing old timer for next song...")
+          await supabase.from("games").update({
+            song_start_time: null,
+            song_duration: null
+          }).eq("id", gameId)
 
-        // Set phase to playback BEFORE navigating
-        console.log("[v0] 🔄 Setting phase to playback for next song...")
-        await setGamePhase(gameId, 'playback')
-        console.log("[v0] ✅ Phase set to playback - ALL players will be redirected")
+          // Set phase to playback BEFORE navigating
+          console.log("[v0] 🔄 Setting phase to playback for next song...")
+          await setGamePhase(gameId, 'playback')
+          console.log("[v0] ✅ Phase set to playback - ALL players will be redirected")
+        } else {
+          console.log("[v0] ⏳ NON-OWNER: Waiting for song owner to set next song and phase")
+          // Wait for song owner to complete database updates
+          await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
 
         // CRITICAL: Set navigation guard BEFORE any async operations
         if (hasNavigated.current) {
