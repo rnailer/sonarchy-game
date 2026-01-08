@@ -244,6 +244,14 @@ export default function PlaytimePlayback() {
       addDebugLog(`👑 Host user ID: ${game.host_user_id}`)
       addDebugLog(`🎵 Current song player ID: ${game.current_song_player_id || "NONE - need to select next song"}`)
 
+      // CRITICAL: Clear any stale timer on mount to prevent timer from previous song
+      addDebugLog("🧹 Clearing any stale timer from previous song...")
+      await supabase.from("games").update({
+        song_start_time: null,
+        song_duration: null
+      }).eq("id", game.id)
+      addDebugLog("✅ Timer cleared - fresh start for this song")
+
       if (game.current_song_player_id) {
         addDebugLog(`🎯 Using current synchronized song for ALL players: ${game.current_song_player_id}`)
 
