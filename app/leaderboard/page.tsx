@@ -49,7 +49,7 @@ export default function Leaderboard() {
   // Pages should not set their own phase - it conflicts with phase sync
   // Phase is set by: playback page (via timer expiration or skip vote)
 
-  const [timeRemaining, setTimeRemaining] = useState(15)
+  const [timeRemaining, setTimeRemaining] = useState(10)
   const [showTimeUp, setShowTimeUp] = useState(false)
   const [timeUpDuration, setTimeUpDuration] = useState(0)
 
