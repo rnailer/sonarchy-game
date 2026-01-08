@@ -327,7 +327,13 @@ export default function Leaderboard() {
         await setGamePhase(gameId, 'playback')
         console.log("[v0] ✅ Phase set to playback - ALL players will be redirected")
 
+        // CRITICAL: Set navigation guard BEFORE any async operations
+        if (hasNavigated.current) {
+          console.log("[v0] ⚠️ Navigation already in progress, skipping")
+          return
+        }
         hasNavigated.current = true
+
         await new Promise((resolve) => setTimeout(resolve, 500))
 
         // Navigate to playback (phase sync will also handle this for other players)
@@ -357,7 +363,11 @@ export default function Leaderboard() {
         `📊 After placements: ${game.current_round >= totalPlayerCount ? "FINAL RESULTS" : "ROUND " + (game.current_round + 1)}`,
       ])
 
-      // CRITICAL: Set hasNavigated immediately to prevent double-polling
+      // CRITICAL: Set navigation guard BEFORE any async operations
+      if (hasNavigated.current) {
+        console.log("[v0] ⚠️ Navigation already in progress, skipping final placements redirect")
+        return
+      }
       hasNavigated.current = true
 
       console.log("[v0] 🏆 Navigating to final placements for round", game.current_round)

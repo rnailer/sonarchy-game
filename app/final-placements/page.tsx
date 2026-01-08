@@ -44,6 +44,7 @@ function FinalPlacementsContent() {
   const [songOwnerId, setSongOwnerId] = useState<string | null>(songOwnerIdFromUrl)
 
   const [players, setPlayers] = useState<Player[]>([])
+  const [spectators, setSpectators] = useState<Player[]>([])
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
@@ -132,9 +133,14 @@ function FinalPlacementsContent() {
         }
       })
 
-      // Sort by placement
-      playerData.sort((a, b) => a.placement - b.placement)
-      setPlayers(playerData)
+      // Split into players with songs (Top Players) and without songs (Spectators)
+      const playersWithSongs = playerData.filter(p => p.songs.length > 0)
+      const playersWithoutSongs = playerData.filter(p => p.songs.length === 0)
+
+      // Sort players with songs by placement
+      playersWithSongs.sort((a, b) => a.placement - b.placement)
+      setPlayers(playersWithSongs)
+      setSpectators(playersWithoutSongs)
     }
 
     loadPlayers()
@@ -434,7 +440,10 @@ function FinalPlacementsContent() {
     handleSubmitRef.current = handleSubmit
   }, [handleSubmit])
 
-  const handlePlayerTap = (playerId: string) => {
+  const handlePlayerTap = (playerId: string, isSpectator: boolean = false) => {
+    // Prevent interaction with spectators
+    if (isSpectator) return
+
     if (selectedPlayerId === playerId) {
       setSelectedPlayerId(null)
     } else if (selectedPlayerId === null) {
@@ -544,73 +553,122 @@ function FinalPlacementsContent() {
           padding: "24px",
         }}
       >
-        <div className="space-y-3">
-          {players.map((player) => {
-            const isExpanded = expandedPlayers.has(player.id)
-            const isSelected = selectedPlayerId === player.id
-            const colorIndex = getPlayerColorIndex(player.id)
-            const colors = PLAYER_COLOR_SETS[colorIndex % PLAYER_COLOR_SETS.length]
-            const latestSong = player.songs[player.songs.length - 1]
+        {/* Top Players Section */}
+        {players.length > 0 && (
+          <>
+            <h2 className="text-[18px] font-bold text-white mb-3" style={{ color: "#8BE1FF" }}>
+              Top Players
+            </h2>
+            <div className="space-y-3 mb-6">
+              {players.map((player) => {
+                const isExpanded = expandedPlayers.has(player.id)
+                const isSelected = selectedPlayerId === player.id
+                const colorIndex = getPlayerColorIndex(player.id)
+                const colors = PLAYER_COLOR_SETS[colorIndex % PLAYER_COLOR_SETS.length]
+                const latestSong = player.songs[player.songs.length - 1]
 
-            return (
-              <div
-                key={player.id}
-                onClick={() => handlePlayerTap(player.id)}
-                className="rounded-2xl transition-all cursor-pointer"
-                style={{
-                  background: colors.bg,
-                  border: `2px solid ${isSelected ? "#FFD03B" : colors.border}`,
-                  boxShadow: isSelected ? "0 0 0 3px rgba(255, 208, 59, 0.3)" : "none",
-                  padding: "16px",
-                }}
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-extrabold"
-                      style={{
-                        background: colors.shadow,
-                        color: "white",
-                      }}
-                    >
-                      {player.placement}
-                    </div>
-                    <div>
-                      <div className="text-[18px] font-bold text-white">{player.player_name}</div>
-                      {latestSong && (
-                        <div className="text-[12px] text-white/70">
-                          {latestSong.song_title} - {latestSong.song_artist}
+                return (
+                  <div
+                    key={player.id}
+                    onClick={() => handlePlayerTap(player.id, false)}
+                    className="rounded-2xl transition-all cursor-pointer"
+                    style={{
+                      background: colors.bg,
+                      border: `2px solid ${isSelected ? "#FFD03B" : colors.border}`,
+                      boxShadow: isSelected ? "0 0 0 3px rgba(255, 208, 59, 0.3)" : "none",
+                      padding: "16px",
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-extrabold"
+                          style={{
+                            background: colors.shadow,
+                            color: "white",
+                          }}
+                        >
+                          {player.placement}
                         </div>
+                        <div>
+                          <div className="text-[18px] font-bold text-white">{player.player_name}</div>
+                          {latestSong && (
+                            <div className="text-[12px] text-white/70">
+                              {latestSong.song_title} - {latestSong.song_artist}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {player.songs.length > 1 && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleExpand(player.id)
+                          }}
+                          className="text-white/70 hover:text-white"
+                        >
+                          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+                        </button>
                       )}
                     </div>
-                  </div>
 
-                  {player.songs.length > 1 && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        toggleExpand(player.id)
-                      }}
-                      className="text-white/70 hover:text-white"
-                    >
-                      {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-                    </button>
-                  )}
-                </div>
-
-                {isExpanded && player.songs.length > 1 && (
-                  <div className="mt-3 pt-3 border-t border-white/20 space-y-2">
-                    {player.songs.slice(0, -1).map((song, index) => (
-                      <div key={index} className="text-[12px] text-white/70">
-                        Round {song.round}: {song.song_title} - {song.song_artist}
+                    {isExpanded && player.songs.length > 1 && (
+                      <div className="mt-3 pt-3 border-t border-white/20 space-y-2">
+                        {player.songs.slice(0, -1).map((song, index) => (
+                          <div key={index} className="text-[12px] text-white/70">
+                            Round {song.round}: {song.song_title} - {song.song_artist}
+                          </div>
+                        ))}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-            )
-          })}
-        </div>
+                )
+              })}
+            </div>
+          </>
+        )}
+
+        {/* Spectators Section */}
+        {spectators.length > 0 && (
+          <>
+            <h2 className="text-[18px] font-bold text-white/50 mb-3">
+              Spectators
+            </h2>
+            <div className="space-y-3">
+              {spectators.map((player, index) => {
+                return (
+                  <div
+                    key={player.id}
+                    className="rounded-2xl transition-all opacity-50"
+                    style={{
+                      background: "#1a1a2e",
+                      border: "2px solid #4a4a5e",
+                      padding: "16px",
+                      cursor: "not-allowed",
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-12 h-12 rounded-full flex items-center justify-center text-2xl font-extrabold"
+                        style={{
+                          background: "#4a4a5e",
+                          color: "white",
+                        }}
+                      >
+                        -
+                      </div>
+                      <div>
+                        <div className="text-[18px] font-bold text-white/70">{player.player_name}</div>
+                        <div className="text-[12px] text-white/50">No song selected</div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </>
+        )}
       </div>
 
     </div>
