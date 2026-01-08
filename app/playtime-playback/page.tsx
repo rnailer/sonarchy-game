@@ -15,7 +15,7 @@ import { useServerTimer } from "@/lib/hooks/use-server-timer"
 import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
 import { setGamePhase } from '@/lib/game-phases'
 
-const SHOW_DEBUG = true
+const SHOW_DEBUG = false
 
 declare global {
   interface Window {
@@ -60,7 +60,6 @@ export default function PlaytimePlayback() {
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const timerStartedRef = useRef(false)
-  const [countdown, setCountdown] = useState<number | "GO" | null>(null)
 
   // Phase sync for playback
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
@@ -850,11 +849,11 @@ export default function PlaytimePlayback() {
   useEffect(() => {
     if (!playerData) return
 
-    console.log("[v0] 🎬 Starting countdown before playback...")
-    addDebugLog("🎬 Starting countdown before playback...")
-
-    // Start countdown sequence: 3, 2, 1, GO
-    setCountdown(3)
+    console.log("[v0] ⏱️ Starting playback timer...")
+    addDebugLog("⏱️ Starting playback timer...")
+    setHasStartedPlayback(true)
+    hasStartedPlaybackRef.current = true
+    setIsAnimatingIn(false)
 
     console.log("[v0] Player data:", playerData)
     console.log("[v0] Song URI:", playerData.song_uri)
@@ -862,34 +861,6 @@ export default function PlaytimePlayback() {
     addDebugLog(`🎵 Song URI: ${playerData.song_uri}`)
     addDebugLog(`🎵 Preview URL: ${playerData.song_preview_url || "MISSING"}`)
   }, [playerData]) // Removed simulatedPlaybackActive from dependencies
-
-  // Countdown animation effect
-  useEffect(() => {
-    if (countdown === null) return
-
-    if (countdown === "GO") {
-      // Show "GO" for 500ms, then start playback
-      const timer = setTimeout(() => {
-        console.log("[v0] ⏱️ Countdown complete! Starting playback...")
-        addDebugLog("⏱️ Countdown complete! Starting playback...")
-        setCountdown(null)
-        setHasStartedPlayback(true)
-        hasStartedPlaybackRef.current = true
-        setIsAnimatingIn(false)
-      }, 500)
-      return () => clearTimeout(timer)
-    } else if (typeof countdown === "number" && countdown > 0) {
-      // Countdown: 3, 2, 1
-      const timer = setTimeout(() => {
-        if (countdown === 1) {
-          setCountdown("GO")
-        } else {
-          setCountdown(countdown - 1)
-        }
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [countdown])
 
   // Start server timer when playback begins
   useEffect(() => {
@@ -1739,55 +1710,6 @@ export default function PlaytimePlayback() {
             </button>
           </div>
         </div>
-      )}
-
-      {/* Countdown overlay (3-2-1-GO) */}
-      {countdown !== null && (
-        <>
-          <div
-            className="fixed inset-0 z-[200]"
-            style={{
-              background: "rgba(0, 0, 34, 0.95)",
-            }}
-          />
-          <div
-            className="fixed inset-0 z-[201] flex items-center justify-center"
-          >
-            <div
-              className="text-center"
-              style={{
-                animation: countdown === "GO" ? "scaleInBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)" : "pulse 0.8s ease-in-out",
-              }}
-            >
-              <div
-                className="font-black"
-                style={{
-                  fontSize: countdown === "GO" ? "8rem" : "12rem",
-                  background: countdown === "GO"
-                    ? "linear-gradient(to right, #00FF88, #00D4AA)"
-                    : "linear-gradient(to right, #8BE1FF, #0D91EA)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  textShadow: "0 8px 16px rgba(0, 0, 0, 0.5)",
-                  lineHeight: 1,
-                }}
-              >
-                {countdown === "GO" ? "GO!" : countdown}
-              </div>
-            </div>
-          </div>
-          <style jsx>{`
-            @keyframes pulse {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.1); opacity: 0.8; }
-            }
-            @keyframes scaleInBounce {
-              0% { transform: scale(0.3); opacity: 0; }
-              50% { transform: scale(1.15); }
-              100% { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
-        </>
       )}
 
       {showOverlay && (

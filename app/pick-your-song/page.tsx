@@ -41,6 +41,7 @@ export default function PickYourSong() {
   const [gameId, setGameId] = useState<string>("")
   const [category, setCategory] = useState<string>("Songs about cars or driving")
   const timerStartedRef = useRef(false)
+  const [countdown, setCountdown] = useState<number | "GO" | null>(3)
 
   // Phase sync for song selection
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
@@ -105,6 +106,30 @@ export default function PickYourSong() {
       audioRef.current.volume = isMuted ? 0 : 0.5
     }
   }, [isMuted])
+
+  // Countdown animation effect (3-2-1-GO)
+  useEffect(() => {
+    if (countdown === null) return
+
+    if (countdown === "GO") {
+      // Show "GO" for 500ms, then enable search
+      const timer = setTimeout(() => {
+        console.log("[v0] ⏱️ Countdown complete! Song selection enabled")
+        setCountdown(null)
+      }, 500)
+      return () => clearTimeout(timer)
+    } else if (typeof countdown === "number" && countdown > 0) {
+      // Countdown: 3, 2, 1
+      const timer = setTimeout(() => {
+        if (countdown === 1) {
+          setCountdown("GO")
+        } else {
+          setCountdown(countdown - 1)
+        }
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [countdown])
 
   // Fetch gameId and start timer
   useEffect(() => {
@@ -943,13 +968,16 @@ export default function PickYourSong() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search..."
+              placeholder={countdown !== null ? "Wait for countdown..." : "Search..."}
+              disabled={countdown !== null}
               className="w-full text-white rounded-2xl px-4 pr-12 outline-none"
               style={{
                 background: "#000022",
                 border: "2px solid #C7D2FF",
                 fontSize: "16px",
                 height: "56px",
+                opacity: countdown !== null ? 0.5 : 1,
+                cursor: countdown !== null ? "not-allowed" : "text",
               }}
             />
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#C7D2FF]" />
@@ -1067,6 +1095,55 @@ export default function PickYourSong() {
               You can still change your mind.
             </p>
           </div>
+        </>
+      )}
+
+      {/* Countdown overlay (3-2-1-GO) */}
+      {countdown !== null && (
+        <>
+          <div
+            className="fixed inset-0 z-[200]"
+            style={{
+              background: "rgba(0, 0, 34, 0.95)",
+            }}
+          />
+          <div
+            className="fixed inset-0 z-[201] flex items-center justify-center"
+          >
+            <div
+              className="text-center"
+              style={{
+                animation: countdown === "GO" ? "scaleInBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)" : "pulse 0.8s ease-in-out",
+              }}
+            >
+              <div
+                className="font-black"
+                style={{
+                  fontSize: countdown === "GO" ? "8rem" : "12rem",
+                  background: countdown === "GO"
+                    ? "linear-gradient(to right, #00FF88, #00D4AA)"
+                    : "linear-gradient(to right, #8BE1FF, #0D91EA)",
+                  WebkitBackgroundClip: "text",
+                  WebkitTextFillColor: "transparent",
+                  textShadow: "0 8px 16px rgba(0, 0, 0, 0.5)",
+                  lineHeight: 1,
+                }}
+              >
+                {countdown === "GO" ? "GO!" : countdown}
+              </div>
+            </div>
+          </div>
+          <style jsx>{`
+            @keyframes pulse {
+              0%, 100% { transform: scale(1); opacity: 1; }
+              50% { transform: scale(1.1); opacity: 0.8; }
+            }
+            @keyframes scaleInBounce {
+              0% { transform: scale(0.3); opacity: 0; }
+              50% { transform: scale(1.15); }
+              100% { transform: scale(1); opacity: 1; }
+            }
+          `}</style>
         </>
       )}
     </div>
