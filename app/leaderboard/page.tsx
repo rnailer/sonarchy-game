@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client"
 import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
 import { setGamePhase } from '@/lib/game-phases'
 
-const SHOW_DEBUG = true
+const SHOW_DEBUG = false
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },

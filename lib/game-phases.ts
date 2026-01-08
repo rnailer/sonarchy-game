@@ -72,7 +72,31 @@ export async function getCurrentPhase(gameCode: string): Promise<GamePhase | nul
 export async function setGamePhase(gameId: string, phase: GamePhase): Promise<boolean> {
   const supabase = createClient()
 
-  console.log(`[GamePhase] Setting phase to: ${phase}`)
+  // CRITICAL: Fetch current phase to validate transition
+  const { data: currentGame } = await supabase
+    .from('games')
+    .select('current_phase')
+    .eq('id', gameId)
+    .single()
+
+  const currentPhase = currentGame?.current_phase as GamePhase | null
+
+  console.log(`[GamePhase] 🔄 Transition request: ${currentPhase || 'null'} -> ${phase}`)
+
+  // Validate transition (skip validation if current phase is null - first time setup)
+  if (currentPhase && !isValidTransition(currentPhase, phase)) {
+    console.error(`[GamePhase] ❌ INVALID TRANSITION: ${currentPhase} -> ${phase}`)
+    console.error(`[GamePhase] ⚠️ This would cause players to get stuck! Blocking transition.`)
+    return false
+  }
+
+  // If already at target phase, skip update
+  if (currentPhase === phase) {
+    console.log(`[GamePhase] ℹ️ Already at phase ${phase}, skipping update`)
+    return true
+  }
+
+  console.log(`[GamePhase] ✅ Valid transition: ${currentPhase} -> ${phase}`)
 
   const { error } = await supabase
     .from('games')
@@ -80,7 +104,7 @@ export async function setGamePhase(gameId: string, phase: GamePhase): Promise<bo
     .eq('id', gameId)
 
   if (error) {
-    console.error('[GamePhase] Error setting phase:', error)
+    console.error('[GamePhase] ❌ Error setting phase:', error)
     return false
   }
 

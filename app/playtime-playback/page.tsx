@@ -1584,7 +1584,8 @@ export default function PlaytimePlayback() {
     )
   }
 
-  if (!playerData) {
+  // CRITICAL: Don't render if player has no song (prevents flicker during navigation)
+  if (!playerData || !playerData.song_uri) {
     return (
       <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
         {/* Added debug panel to no player data screen */}
@@ -1602,14 +1603,8 @@ export default function PlaytimePlayback() {
           </div>
         )}
         <div className="text-center max-w-md">
-          <div className="text-2xl font-bold mb-2">No player data found</div>
-          <div className="text-lg text-white/70 mb-6">Please select a song first</div>
-          <button
-            onClick={handleSkipToVoting}
-            className="px-6 py-3 bg-[#8BE1FF] text-[#000022] font-bold rounded-xl hover:bg-[#6CD9FF] transition-colors"
-          >
-            Skip to Voting
-          </button>
+          <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="text-lg text-white/70">Loading next song...</div>
         </div>
       </div>
     )
