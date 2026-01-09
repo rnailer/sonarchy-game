@@ -330,11 +330,13 @@ function FinalPlacementsContent() {
           current_category: null,
           current_song_player_id: null,
           next_category_picker_id: nextCategoryPickerId,
-          // Clear old timers from previous round
+          // CRITICAL: Clear ALL timers from previous round
           category_selection_start_time: null,
           category_selection_duration: null,
           song_selection_start_time: null,
           song_selection_duration: null,
+          song_start_time: null,
+          song_duration: null,
           final_placements_start_time: null,
           final_placements_duration: null,
         })
