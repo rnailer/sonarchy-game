@@ -39,10 +39,11 @@ function FinalPlacementsContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const gameCode = searchParams.get("code")
-  const currentRound = parseInt(searchParams.get("round") || "1")
   const songOwnerIdFromUrl = searchParams.get("songOwnerId")
   const [songOwnerId, setSongOwnerId] = useState<string | null>(songOwnerIdFromUrl)
 
+  // CRITICAL: Read currentRound from database, NOT from URL params (can be stale)
+  const [currentRound, setCurrentRound] = useState(1)
   const [players, setPlayers] = useState<Player[]>([])
   const [spectators, setSpectators] = useState<Player[]>([])
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
@@ -79,13 +80,16 @@ function FinalPlacementsContent() {
       const supabase = createClient()
       const { data: game } = await supabase
         .from("games")
-        .select("id")
+        .select("id, current_round")
         .eq("game_code", gameCode)
         .single()
 
       if (!game) return
 
       setGameId(game.id)
+      // CRITICAL: Set current round from database, not URL params
+      setCurrentRound(game.current_round || 1)
+      console.log("[v0] 📊 Loaded current round from database:", game.current_round)
 
       // Get all players
       const { data: gamePlayers } = await supabase
