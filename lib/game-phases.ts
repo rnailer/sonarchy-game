@@ -140,6 +140,9 @@ export function getPageForPhase(
  * Helper to determine if a phase transition is valid
  */
 export function isValidTransition(from: GamePhase, to: GamePhase): boolean {
+  // Same phase is always valid (harmless no-op)
+  if (from === to) return true
+
   const validTransitions: Record<GamePhase, GamePhase[]> = {
     lobby: ['category_selection'],
     category_selection: ['song_selection'],
