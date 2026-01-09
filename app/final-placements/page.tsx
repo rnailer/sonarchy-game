@@ -73,6 +73,16 @@ function FinalPlacementsContent() {
     },
   })
 
+  // Track if timer has loaded from database (prevents showing default 60s)
+  const [timerLoaded, setTimerLoaded] = useState(false)
+
+  // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
+  useEffect(() => {
+    if (timeRemaining <= 10 && timeRemaining >= 0 && !timerLoaded) {
+      setTimerLoaded(true)
+    }
+  }, [timeRemaining, timerLoaded])
+
   useEffect(() => {
     const loadPlayers = async () => {
       if (!gameCode) return
@@ -507,43 +517,57 @@ function FinalPlacementsContent() {
           Tap to adjust your rankings for this round
         </p>
 
-        <div
-          className="rounded-2xl mb-4"
-          style={{
-            background: "#262C87",
-            border: "2px solid #C7D2FF",
-            padding: "12px 16px",
-          }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-[18px] font-semibold text-white">Time Remaining</span>
-            <span
-              className="text-[32px] font-extrabold text-white"
-              style={{
-                textShadow: "2px 2px 0px #0D113B",
-              }}
-            >
-              0:{timeRemaining.toString().padStart(2, "0")}
-            </span>
-          </div>
-
-          <div className="mt-2">
-            <div
-              className="w-full h-2 rounded-full overflow-hidden"
-              style={{
-                background: "#C7D2FF",
-              }}
-            >
-              <div
-                className="h-full transition-all duration-1000"
+        {timerLoaded ? (
+          <div
+            className="rounded-2xl mb-4"
+            style={{
+              background: "#262C87",
+              border: "2px solid #C7D2FF",
+              padding: "12px 16px",
+            }}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[18px] font-semibold text-white">Time Remaining</span>
+              <span
+                className="text-[32px] font-extrabold text-white"
                 style={{
-                  width: `${(timeRemaining / 10) * 100}%`,
-                  background: "#E2A100",
+                  textShadow: "2px 2px 0px #0D113B",
                 }}
-              />
+              >
+                0:{timeRemaining.toString().padStart(2, "0")}
+              </span>
+            </div>
+
+            <div className="mt-2">
+              <div
+                className="w-full h-2 rounded-full overflow-hidden"
+                style={{
+                  background: "#C7D2FF",
+                }}
+              >
+                <div
+                  className="h-full transition-all duration-1000"
+                  style={{
+                    width: `${(timeRemaining / 10) * 100}%`,
+                    background: "#E2A100",
+                  }}
+                />
+              </div>
             </div>
           </div>
-        </div>
+        ) : (
+          <div
+            className="rounded-2xl mb-4 flex items-center justify-center"
+            style={{
+              background: "#262C87",
+              border: "2px solid #C7D2FF",
+              padding: "12px 16px",
+              minHeight: "76px",
+            }}
+          >
+            <div className="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
 
       <div
