@@ -83,6 +83,15 @@ export default function PlayersLockedIn() {
     }
   })
 
+  // CRITICAL: Check if timer is already expired when page loads (Round 2+)
+  // onExpire only fires on transition to 0, not when loading at 0
+  useEffect(() => {
+    if (timeRemaining === 0 && !timerExpired) {
+      console.log("[v0] Timer already at 0 on load - enabling Start Playback button")
+      setTimerExpired(true)
+    }
+  }, [timeRemaining, timerExpired])
+
   useEffect(() => {
     if (!gameCode) return
 
