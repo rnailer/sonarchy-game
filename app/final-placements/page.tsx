@@ -73,8 +73,12 @@ function FinalPlacementsContent() {
     },
   })
 
-  // Track if timer has loaded from database (prevents showing default 60s)
+  // Track loading states to prevent flicker
   const [timerLoaded, setTimerLoaded] = useState(false)
+  const [playersLoaded, setPlayersLoaded] = useState(false)
+
+  // Master loading state - only show content when everything is ready
+  const isFullyLoaded = playersLoaded && timerLoaded
 
   // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
   useEffect(() => {
@@ -155,6 +159,9 @@ function FinalPlacementsContent() {
       playersWithSongs.sort((a, b) => a.placement - b.placement)
       setPlayers(playersWithSongs)
       setSpectators(playersWithoutSongs)
+
+      // Mark players as loaded (prevents flicker)
+      setPlayersLoaded(true)
     }
 
     loadPlayers()
@@ -497,6 +504,15 @@ function FinalPlacementsContent() {
 
   const getPlayerColorIndex = (playerId: string) => {
     return players.findIndex((p) => p.id === playerId)
+  }
+
+  // Show loading spinner until everything is ready (prevents flicker)
+  if (!isFullyLoaded) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-[#000022]">
+        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
   }
 
   return (
