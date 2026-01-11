@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
 import { setGamePhase } from '@/lib/game-phases'
+import { getRoundRankings, insertRanking, type RoundRanking } from '@/lib/round-rankings'
 
 const SHOW_DEBUG = false
 
@@ -36,6 +37,11 @@ export default function Leaderboard() {
   const [totalPlayers, setTotalPlayers] = useState(0)
   const [currentRound, setCurrentRound] = useState(1)
   const [gameId, setGameId] = useState<string | null>(null)
+
+  // NEW: Round rankings state
+  const [rankings, setRankings] = useState<RoundRanking[]>([])
+  const [totalSlots, setTotalSlots] = useState(0)
+  const [songsWithUri, setSongsWithUri] = useState<any[]>([])
 
   // Phase sync for ranking/leaderboard
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
@@ -132,6 +138,37 @@ export default function Leaderboard() {
 
     fetchGameInfo()
   }, [gameCode, currentSongPlayerId])
+
+  // NEW: Fetch round rankings and all songs
+  useEffect(() => {
+    const fetchRankings = async () => {
+      if (!gameId || !currentPlayerId) return
+
+      console.log("[v0] 📊 Fetching round rankings for round", currentRound)
+
+      // Fetch existing rankings for this voter
+      const existingRankings = await getRoundRankings(gameId, currentPlayerId, currentRound)
+      setRankings(existingRankings)
+      console.log("[v0] 📊 Found", existingRankings.length, "existing rankings")
+
+      // Fetch all players with songs this round (for total slot count)
+      const supabase = createClient()
+      const { data: playersWithSongs } = await supabase
+        .from("game_players")
+        .select("*")
+        .eq("game_id", gameId)
+        .not("song_uri", "is", null)
+        .order("joined_at", { ascending: true })
+
+      if (playersWithSongs) {
+        setSongsWithUri(playersWithSongs)
+        setTotalSlots(playersWithSongs.length)
+        console.log("[v0] 📊 Total slots available:", playersWithSongs.length)
+      }
+    }
+
+    fetchRankings()
+  }, [gameId, currentPlayerId, currentRound])
 
   useEffect(() => {
     const fetchCurrentSong = async () => {
@@ -420,35 +457,36 @@ export default function Leaderboard() {
     if (!currentPlayerId || !gameId || !currentSong || isSaving) return
 
     setIsSaving(true)
-    const supabase = createClient()
 
     console.log("[v0] 💾 Placing song at position:", position)
 
-    await supabase.from("leaderboard_placements").upsert({
-      game_id: gameId,
-      round_number: currentRound,
-      player_id: currentPlayerId,
-      song_player_id: currentSong.id,
-      placement_position: position,
-    })
+    // Use new round rankings system
+    const success = await insertRanking(
+      gameId,
+      currentPlayerId,
+      currentRound,
+      currentSong.id,
+      position,
+      totalSlots
+    )
 
-    const newPlacements = { ...myPlacements, [currentSong.id]: position }
-    setMyPlacements(newPlacements)
+    if (success) {
+      // Refresh rankings display
+      const updatedRankings = await getRoundRankings(gameId, currentPlayerId, currentRound)
+      setRankings(updatedRankings)
+      console.log("[v0] ✅ Ranking updated, now have", updatedRankings.length, "songs ranked")
 
-    const { data: allSongsWithUri } = await supabase
-      .from("game_players")
-      .select("id")
-      .eq("game_id", gameId)
-      .not("song_uri", "is", null)
+      // Check if all songs are ranked
+      if (updatedRankings.length >= totalSlots && totalSlots > 0) {
+        console.log("[v0] ✅ All songs placed!")
+        setHasPlacedAllSongs(true)
+      }
 
-    const totalSongs = allSongsWithUri?.length || 0
-    const placedSongs = Object.keys(newPlacements).length
-
-    console.log("[v0] 📊 After placement:", { placedSongs, totalSongs })
-
-    if (placedSongs >= totalSongs && totalSongs > 0) {
-      console.log("[v0] ✅ All songs placed!")
-      setHasPlacedAllSongs(true)
+      // Update old placements map for compatibility with existing code
+      const newPlacements = { ...myPlacements, [currentSong.id]: position }
+      setMyPlacements(newPlacements)
+    } else {
+      console.error("[v0] ❌ Failed to insert ranking")
     }
 
     setIsSaving(false)
@@ -640,9 +678,19 @@ export default function Leaderboard() {
 
           {!isCurrentPlayerSongOwner && (
             <div className="space-y-3">
-              {Array.from({ length: totalPlayers }).map((_, index) => {
+              {Array.from({ length: totalSlots || totalPlayers }).map((_, index) => {
                 const position = index + 1
-                const hasPlacement = myPlacements[currentSong.id] === position
+
+                // Find what song is ranked at this position
+                const rankedSong = rankings.find(r => r.position === position)
+                const rankedPlayer = rankedSong ? songsWithUri.find(p => p.id === rankedSong.song_player_id) : null
+
+                // Check if this is the current song being ranked
+                const isCurrentSong = rankedSong?.song_player_id === currentSong?.id
+
+                // Get color for the ranked song
+                const rankedPlayerColorIndex = rankedPlayer ? getPlayerColorIndex(rankedPlayer.id) : 0
+                const rankedPlayerColor = PLAYER_COLOR_SETS[rankedPlayerColorIndex % PLAYER_COLOR_SETS.length]
 
                 return (
                   <button
@@ -650,37 +698,42 @@ export default function Leaderboard() {
                     onClick={() => handlePlaceSong(position)}
                     disabled={isSaving}
                     className={`w-full p-4 rounded-xl flex items-center gap-3 transition-all ${
-                      hasPlacement ? "scale-95" : ""
+                      isCurrentSong ? "ring-2 ring-yellow-400" : ""
                     }`}
                     style={{
-                      background: hasPlacement ? songPlayerColor.bg : "#0D113B",
-                      border: hasPlacement ? `2px solid ${songPlayerColor.border}` : "2px dashed #4A5FD9",
-                      boxShadow: hasPlacement ? `0 4px 0 0 ${songPlayerColor.shadow}` : "none",
+                      background: rankedSong ? rankedPlayerColor.bg : "#0D113B",
+                      border: rankedSong
+                        ? `2px solid ${rankedPlayerColor.border}`
+                        : "2px dashed #4A5FD9",
+                      boxShadow: rankedSong ? `0 4px 0 0 ${rankedPlayerColor.shadow}` : "none",
                     }}
                   >
-                    {hasPlacement ? (
+                    {rankedSong && rankedPlayer ? (
                       <>
                         <div
                           className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold flex-shrink-0"
-                          style={{ background: songPlayerColor.border, color: songPlayerColor.shadow }}
+                          style={{ background: rankedPlayerColor.border, color: rankedPlayerColor.shadow }}
                         >
                           {position}
                         </div>
                         <img
-                          src={currentSong?.album_cover_url || "/placeholder.svg"}
+                          src={rankedPlayer.album_cover_url || "/placeholder.svg"}
                           alt="Album cover"
                           className="w-12 h-12 rounded-lg flex-shrink-0"
                         />
                         <div className="flex-1 text-left min-w-0">
-                          <div className="text-sm font-bold text-white truncate">{currentSong?.song_title}</div>
-                          <div className="text-xs text-white/80 truncate">{currentSong?.song_artist}</div>
+                          <div className="text-sm font-bold text-white truncate">{rankedPlayer.song_title}</div>
+                          <div className="text-xs text-white/80 truncate">{rankedPlayer.song_artist}</div>
                           <div
                             className="text-xs font-semibold mt-1 truncate"
-                            style={{ color: songPlayerColor.border }}
+                            style={{ color: rankedPlayerColor.border }}
                           >
-                            by {currentSong?.player_name}
+                            by {rankedPlayer.player_name}
                           </div>
                         </div>
+                        {isCurrentSong && (
+                          <div className="text-yellow-400 text-xs font-bold">CURRENT</div>
+                        )}
                       </>
                     ) : (
                       <>
