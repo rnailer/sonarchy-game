@@ -11,6 +11,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { RealtimeChannel } from '@supabase/supabase-js'
 import { GamePhase, getCurrentPhase, getPageForPhase, PAGE_TO_PHASE } from '@/lib/game-phases'
 
 // Phase ordering - prevents backwards navigation (except for legitimate round resets)
@@ -29,6 +30,8 @@ interface UsePhaseSyncOptions {
   gameCode: string
   gameId: string | null
   expectedPhase: GamePhase | GamePhase[]
+  /** Expected round number (defaults to 1) */
+  expectedRound?: number
   /** Additional params to include when redirecting */
   redirectParams?: Record<string, string>
   /** Disable sync (for debugging) */
@@ -42,7 +45,7 @@ interface UsePhaseSyncReturn {
 }
 
 export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
-  const { gameCode, gameId, expectedPhase, redirectParams, disabled } = options
+  const { gameCode, gameId, expectedPhase, expectedRound, redirectParams, disabled } = options
   const router = useRouter()
   const [currentPhase, setCurrentPhase] = useState<GamePhase | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -51,6 +54,10 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
   const lastPhase = useRef<GamePhase | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
   const mountTime = useRef(Date.now())
+  const subscriptionRef = useRef<any>(null)
+  const retryCount = useRef(0)
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const MAX_RETRIES = 3
 
   // Reset hasNavigated when we're on the correct page
   useEffect(() => {
@@ -78,29 +85,54 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
     hasCheckedPhase.current = true
 
     const checkPhase = async () => {
-      console.log(`[PhaseSync] Checking phase for ${gameCode}, expected: ${expectedPhase}`)
+      console.log(`[PhaseSync] Checking phase for ${gameCode}, expected: ${expectedPhase}, expectedRound: ${expectedRound}`)
 
-      const phase = await getCurrentPhase(gameCode)
+      // Fetch both phase AND round from database
+      const supabase = createClient()
+      const { data: game } = await supabase
+        .from('games')
+        .select('current_phase, current_round')
+        .eq('game_code', gameCode)
+        .single()
 
-      if (!phase) {
+      if (!game?.current_phase) {
         console.error('[PhaseSync] Could not fetch current phase')
         setIsLoading(false)
         return
       }
 
+      const phase = game.current_phase as GamePhase
+      const dbRound = game.current_round || 1
+      const expectedRoundNum = expectedRound ?? 1
+
       const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
       const primaryExpectedPhase = expectedPhases[0]
       const isOnValidPhase = expectedPhases.includes(phase)
 
-      console.log(`[PhaseSync] Current phase: ${phase}, Expected: ${expectedPhases.join(' or ')}`)
+      console.log(`[PhaseSync] Current phase: ${phase} (round ${dbRound}), Expected: ${expectedPhases.join(' or ')} (round ${expectedRoundNum})`)
       setCurrentPhase(phase)
 
-      // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
+      // CRITICAL: Compare rounds first before comparing phases
       const timeSinceMount = Date.now() - mountTime.current
-      const currentIndex = PHASE_ORDER.indexOf(phase)
-      const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
-      const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
-      const playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+      let playerIsBehind = false
+      let playerIsAhead = false
+
+      if (dbRound > expectedRoundNum) {
+        // New round started - player is BEHIND (still on old round's page)
+        playerIsBehind = true
+        console.log(`[PhaseSync] 🔄 New round started (DB: ${dbRound}, Page: ${expectedRoundNum}) - Player is BEHIND`)
+      } else if (dbRound < expectedRoundNum) {
+        // Shouldn't happen - player's page is ahead of database round
+        console.error(`[PhaseSync] ⚠️ Round went backwards? DB: ${dbRound}, Page: ${expectedRoundNum}`)
+        setIsLoading(false)
+        return
+      } else {
+        // Same round - use phase order comparison
+        const currentIndex = PHASE_ORDER.indexOf(phase)
+        const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
+        playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+        playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+      }
 
       if (timeSinceMount < 500 && !playerIsBehind) {
         console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping redirect check`)
@@ -144,87 +176,164 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
     checkPhase()
   }, [gameCode, expectedPhase, disabled, redirectParams, router])
 
-  // Subscribe to phase changes
+  // Stabilize dependencies to prevent unnecessary subscription recreation
+  const expectedPhaseKey = Array.isArray(expectedPhase)
+    ? expectedPhase.slice().sort().join(',')
+    : expectedPhase
+
+  const redirectParamsKey = redirectParams
+    ? JSON.stringify(redirectParams)
+    : ''
+
+  // Subscription effect with retry logic
   useEffect(() => {
     if (disabled || !gameId || !gameCode) return
 
     const supabase = createClient()
     let isSubscribed = true
+    let channel: RealtimeChannel | null = null
 
-    console.log(`[PhaseSync] Setting up subscription for game ${gameId}`)
+    const setupSubscription = () => {
+      if (!isSubscribed) return
 
-    const channel = supabase
-      .channel(`phase_sync_${gameId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'games',
-          filter: `id=eq.${gameId}`,
-        },
-        (payload) => {
-          if (!isSubscribed) return
+      // Clean up existing subscription before creating new one
+      if (subscriptionRef.current) {
+        console.log("[PhaseSync] Cleaning up existing subscription before reconnect")
+        supabase.removeChannel(subscriptionRef.current)
+        subscriptionRef.current = null
+      }
 
-          const newPhase = payload.new.current_phase as GamePhase
-          const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
-          const primaryExpectedPhase = expectedPhases[0]
-          const isOnValidPhase = expectedPhases.includes(newPhase)
+      console.log(`[PhaseSync] Setting up subscription for game ${gameId}`)
 
-          console.log(`[PhaseSync] Phase changed to: ${newPhase}`)
-          setCurrentPhase(newPhase)
+      channel = supabase
+        .channel(`phase_sync_${gameId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'games',
+            filter: `id=eq.${gameId}`,
+          },
+          async (payload) => {
+            if (!isSubscribed) return
 
-          // Grace period: Don't redirect for first 500ms UNLESS player is clearly behind
-          const timeSinceMount = Date.now() - mountTime.current
-          const currentIndex = PHASE_ORDER.indexOf(newPhase)
-          const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
-          const playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
-          const playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+            const newPhase = payload.new.current_phase as GamePhase
+            const dbRound = payload.new.current_round || 1
+            const expectedRoundNum = expectedRound ?? 1
 
-          if (timeSinceMount < 500 && !playerIsBehind) {
-            console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
-            return
-          }
+            const expectedPhases = Array.isArray(expectedPhase) ? expectedPhase : [expectedPhase]
+            const primaryExpectedPhase = expectedPhases[0]
+            const isOnValidPhase = expectedPhases.includes(newPhase)
 
-          // CRITICAL: Never redirect backwards unless it's a legitimate round reset
-          // Only redirect forward (player is behind) or to valid phases
-          if (playerIsAhead) {
-            console.log(`[PhaseSync] ⚠️ Player is AHEAD (expected: ${primaryExpectedPhase}, current: ${newPhase}) - NOT redirecting backwards`)
-            return
-          }
+            console.log(`[PhaseSync] Phase changed to: ${newPhase} (round ${dbRound})`)
+            setCurrentPhase(newPhase)
 
-          if (playerIsBehind) {
-            console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${newPhase}), redirecting forward`)
-          }
+            // CRITICAL: Compare rounds first before comparing phases
+            const timeSinceMount = Date.now() - mountTime.current
+            let playerIsBehind = false
+            let playerIsAhead = false
 
-          // If we're on wrong page, redirect with debouncing
-          if (!isOnValidPhase && !hasNavigated.current) {
-            console.log(`[PhaseSync] Phase changed, scheduling redirect to ${newPhase} page`)
-
-            if (redirectTimeout.current) {
-              clearTimeout(redirectTimeout.current)
+            if (dbRound > expectedRoundNum) {
+              // New round started - player is BEHIND (still on old round's page)
+              playerIsBehind = true
+              console.log(`[PhaseSync] 🔄 New round started (DB: ${dbRound}, Page: ${expectedRoundNum}) - Player is BEHIND`)
+            } else if (dbRound < expectedRoundNum) {
+              // Shouldn't happen - player's page is ahead of database round
+              console.error(`[PhaseSync] ⚠️ Round went backwards? DB: ${dbRound}, Page: ${expectedRoundNum}`)
+              return
+            } else {
+              // Same round - use phase order comparison
+              const currentIndex = PHASE_ORDER.indexOf(newPhase)
+              const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
+              playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+              playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
             }
 
-            redirectTimeout.current = setTimeout(() => {
-              if (!hasNavigated.current && !isOnValidPhase) {
-                console.log(`[PhaseSync] Executing auto-redirect to ${newPhase}`)
-                hasNavigated.current = true
-                const redirectUrl = getPageForPhase(newPhase, gameCode, redirectParams)
-                router.push(redirectUrl)
+            if (timeSinceMount < 500 && !playerIsBehind) {
+              console.log(`[PhaseSync] In grace period (${timeSinceMount}ms since mount), skipping subscription redirect`)
+              return
+            }
+
+            if (playerIsAhead) {
+              console.log(`[PhaseSync] ⚠️ Player is AHEAD (expected: ${primaryExpectedPhase}, current: ${newPhase}) - NOT redirecting backwards`)
+              return
+            }
+
+            if (!isOnValidPhase && !hasNavigated.current) {
+              // Clear any existing redirect timeout
+              if (redirectTimeout.current) {
+                clearTimeout(redirectTimeout.current)
               }
-            }, 200) // 200ms debounce
+
+              if (playerIsBehind) {
+                console.log(`[PhaseSync] Player is behind (expected: ${primaryExpectedPhase}, current: ${newPhase}), redirecting forward`)
+              }
+
+              console.log(`[PhaseSync] Phase changed, scheduling redirect to ${newPhase} page`)
+
+              // Small delay to let other state settle
+              redirectTimeout.current = setTimeout(() => {
+                if (!hasNavigated.current && isSubscribed) {
+                  hasNavigated.current = true
+                  console.log(`[PhaseSync] Executing auto-redirect to ${newPhase}`)
+                  const redirectUrl = getPageForPhase(newPhase, gameCode, redirectParams)
+                  router.push(redirectUrl)
+                }
+              }, 100)
+            }
           }
-        }
-      )
-      .subscribe((status) => {
-        console.log(`[PhaseSync] Subscription status: ${status}`)
-      })
+        )
+        .subscribe((status) => {
+          if (!isSubscribed) return
+
+          console.log(`[PhaseSync] Subscription status: ${status}`)
+
+          if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+            if (retryCount.current < MAX_RETRIES) {
+              const delay = Math.pow(2, retryCount.current) * 1000 // 1s, 2s, 4s
+              console.log(`[PhaseSync] ⚠️ Connection failed, retrying in ${delay}ms (attempt ${retryCount.current + 1}/${MAX_RETRIES})`)
+
+              retryTimeoutRef.current = setTimeout(() => {
+                if (isSubscribed) {
+                  retryCount.current++
+                  setupSubscription()
+                }
+              }, delay)
+            } else {
+              console.error('[PhaseSync] ❌ Max retries reached, subscription failed permanently')
+            }
+          } else if (status === 'SUBSCRIBED') {
+            retryCount.current = 0 // Reset retry count on successful connection
+            subscriptionRef.current = channel
+          }
+        })
+    }
+
+    setupSubscription()
 
     return () => {
+      console.log(`[PhaseSync] Cleaning up subscription for game ${gameId}`)
       isSubscribed = false
-      supabase.removeChannel(channel)
+
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
+        retryTimeoutRef.current = null
+      }
+
+      if (redirectTimeout.current) {
+        clearTimeout(redirectTimeout.current)
+        redirectTimeout.current = null
+      }
+
+      if (channel) {
+        supabase.removeChannel(channel)
+      }
+
+      subscriptionRef.current = null
+      retryCount.current = 0
     }
-  }, [gameId, gameCode, expectedPhase, disabled, redirectParams, router])
+  }, [gameId, gameCode, expectedPhaseKey, expectedRound, disabled, redirectParamsKey, router])
 
   const isCorrectPhase = Array.isArray(expectedPhase)
     ? expectedPhase.includes(currentPhase as GamePhase)

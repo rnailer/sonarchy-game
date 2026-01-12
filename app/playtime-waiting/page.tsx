@@ -47,6 +47,7 @@ export default function PlaytimeWaitingPage() {
   const [currentUserId, setCurrentUserId] = useState<string>("")
   const [isHost, setIsHost] = useState(false)
   const [gameId, setGameId] = useState<string>("")
+  const [currentRound, setCurrentRound] = useState<number>(1)
   const [gameStatus, setGameStatus] = useState<string>("")
   const [choosingPlayerId, setChoosingPlayerId] = useState<string>("")
   const [choosingPlayerName, setChoosingPlayerName] = useState<string>("")
@@ -68,6 +69,7 @@ export default function PlaytimeWaitingPage() {
     gameCode,
     gameId,
     expectedPhase: ['song_selection', 'players_locked_in'],
+    expectedRound: currentRound,
     disabled: false,
   })
 
@@ -207,7 +209,7 @@ export default function PlaytimeWaitingPage() {
 
       const { data: game, error: gameError } = await supabase
         .from("games")
-        .select("id, host_user_id, status")
+        .select("id, host_user_id, status, current_round")
         .eq("game_code", code)
         .single()
 
@@ -218,6 +220,7 @@ export default function PlaytimeWaitingPage() {
       }
 
       setGameId(game.id)
+      setCurrentRound(game.current_round || 1)
       setGameStatus(game.status)
       setIsHost(game.host_user_id === authUserId)
 

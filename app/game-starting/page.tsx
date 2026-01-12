@@ -27,6 +27,7 @@ export default function GameStarting() {
     gameCode: gameCode || "",
     gameId,
     expectedPhase: 'lobby',
+    expectedRound: 1,
     disabled: !gameCode || !gameId
   })
 

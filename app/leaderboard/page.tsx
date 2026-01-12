@@ -48,6 +48,7 @@ export default function Leaderboard() {
     gameCode: gameCode || "",
     gameId: gameId || "",
     expectedPhase: 'ranking',
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
 
@@ -162,8 +163,21 @@ export default function Leaderboard() {
 
       if (playersWithSongs) {
         setSongsWithUri(playersWithSongs)
-        setTotalSlots(playersWithSongs.length)
-        console.log("[v0] 📊 Total slots available:", playersWithSongs.length)
+
+        // Check if current player has a song
+        const currentPlayerHasSong = playersWithSongs.some(p => p.id === currentPlayerId)
+
+        // Calculate available slots:
+        // - If current player has a song, they can't vote on it, so total slots = playersWithSongs - 1
+        // - If current player doesn't have a song, they can vote on all songs
+        const availableSlots = currentPlayerHasSong
+          ? playersWithSongs.length - 1  // Can't vote on own song
+          : playersWithSongs.length       // Can vote on all songs
+
+        setTotalSlots(availableSlots)
+        console.log("[v0] 📊 Total players with songs:", playersWithSongs.length)
+        console.log("[v0] 📊 Current player has song:", currentPlayerHasSong)
+        console.log("[v0] 📊 Available ranking slots:", availableSlots)
       }
     }
 

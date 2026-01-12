@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
 import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
 import { setGamePhase } from '@/lib/game-phases'
+import { getRoundRankings, type RoundRanking } from '@/lib/round-rankings'
 
 const PLAYER_COLOR_SETS = [
   { border: "#C084FC", bg: "#A855F7", shadow: "#7C3AED" },
@@ -59,6 +60,7 @@ function FinalPlacementsContent() {
     gameCode: gameCode || "",
     gameId: gameId || "",
     expectedPhase: 'final_placements',
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
 
@@ -116,18 +118,16 @@ function FinalPlacementsContent() {
 
       setTotalPlayers(gamePlayers.length)
 
-      // Get current player's placements for THIS round from leaderboard_placements
+      // Get current player's placements for THIS round from round_rankings
       const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
-      const { data: myPlacements } = await supabase
-        .from("leaderboard_placements")
-        .select("song_player_id, placement_position")
-        .eq("game_id", game.id)
-        .eq("round_number", currentRound)
-        .eq("player_id", myPlayerId)
+
+      // Fetch rankings from round_rankings table
+      const rankings = await getRoundRankings(game.id, myPlayerId || "", game.current_round || 1)
+      console.log("[v0] 📊 Loaded rankings from round_rankings:", rankings)
 
       const placementsMap: Record<string, number> = {}
-      myPlacements?.forEach((p: any) => {
-        placementsMap[p.song_player_id] = p.placement_position
+      rankings.forEach((ranking) => {
+        placementsMap[ranking.song_player_id] = ranking.position
       })
 
       // Show players with their songs from THIS round

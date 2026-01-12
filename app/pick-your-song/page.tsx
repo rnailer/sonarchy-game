@@ -39,8 +39,10 @@ export default function PickYourSong() {
   const gameCode = searchParams.get("code")
 
   const [gameId, setGameId] = useState<string>("")
+  const [currentRound, setCurrentRound] = useState<number>(1)
   const [category, setCategory] = useState<string>("Songs about cars or driving")
   const timerStartedRef = useRef(false)
+  const hasHandledExpiration = useRef(false)
   const [countdown, setCountdown] = useState<number | "GO" | null>(3)
 
   // Phase sync for song selection
@@ -48,6 +50,7 @@ export default function PickYourSong() {
     gameCode: gameCode || "",
     gameId,
     expectedPhase: 'song_selection',
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
 
@@ -56,8 +59,21 @@ export default function PickYourSong() {
     gameId,
     timerType: "song_selection",
     onExpire: async () => {
+      if (hasHandledExpiration.current) {
+        console.log("[v0] ⏰ Timer expiration already handled on this device, skipping")
+        return
+      }
+      hasHandledExpiration.current = true
+
       console.log("[v0] ⏰ Song selection timer expired")
-      await setGamePhase(gameId, 'players_locked_in')
+
+      // Try to set phase - if it's already at players_locked_in, that's fine
+      try {
+        await setGamePhase(gameId, 'players_locked_in')
+        console.log("[v0] ✅ Phase transitioned to players_locked_in")
+      } catch (error) {
+        console.error("[v0] ❌ Failed to transition phase:", error)
+      }
     },
     enabled: !!gameId,
   })
@@ -139,12 +155,13 @@ export default function PickYourSong() {
       const supabase = createClient()
       const { data: game } = await supabase
         .from("games")
-        .select("id")
+        .select("id, current_round")
         .eq("game_code", gameCode)
         .maybeSingle()
 
       if (game) {
         setGameId(game.id)
+        setCurrentRound(game.current_round || 1)
       }
     }
 

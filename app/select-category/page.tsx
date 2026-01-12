@@ -87,6 +87,7 @@ export default function SelectCategory() {
   const playerAvatar = searchParams.get("avatar") || "vinyl"
 
   const [gameId, setGameId] = useState<string>("")
+  const [currentRound, setCurrentRound] = useState<number>(1)
   const [categoryInput, setCategoryInput] = useState("")
   const [selectedPreset, setSelectedPreset] = useState<string | null>(null)
   const [presetCategories, setPresetCategories] = useState<typeof ALL_PRESET_CATEGORIES>([])
@@ -96,6 +97,7 @@ export default function SelectCategory() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
   const timerStartedRef = useRef(false)
+  const hasHandledExpiration = useRef(false)
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(true)
@@ -110,6 +112,7 @@ export default function SelectCategory() {
     gameCode: gameCode || "",
     gameId,
     expectedPhase: 'category_selection',
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
 
@@ -118,6 +121,12 @@ export default function SelectCategory() {
     gameId,
     timerType: "category_selection",
     onExpire: async () => {
+      if (hasHandledExpiration.current) {
+        console.log("[v0] ⏰ Timer expiration already handled, skipping")
+        return
+      }
+      hasHandledExpiration.current = true
+
       console.log("[v0] Category selection timer expired")
 
       // Only the picker should auto-select when timer expires
@@ -178,6 +187,7 @@ export default function SelectCategory() {
 
       if (game) {
         setGameId(game.id) // Set gameId for server timer
+        setCurrentRound(game.current_round || 1)
         addDebug(`📋 Round: ${game.current_round}`)
 
         // Check if this player is the category picker

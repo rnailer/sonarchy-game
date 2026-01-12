@@ -60,14 +60,24 @@ export default function PlaytimePlayback() {
   const [hasStartedPlayback, setHasStartedPlayback] = useState(false)
   const hasStartedPlaybackRef = useRef(false)
   const timerStartedRef = useRef(false)
+  const [isTransitioning, setIsTransitioning] = useState(false)
 
   // Phase sync for playback
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
     gameCode: gameCode || "",
     gameId: gameId || "",
     expectedPhase: 'playback',
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
+
+  // Detect when phase changes away from playback and show transition state
+  useEffect(() => {
+    if (currentPhase && currentPhase !== 'playback') {
+      console.log("[v0] Phase changed away from playback, showing transition state")
+      setIsTransitioning(true)
+    }
+  }, [currentPhase])
 
   // REMOVED: Phase should be set BEFORE navigation, not on page load
   // Pages should not set their own phase - it conflicts with phase sync
@@ -764,22 +774,56 @@ export default function PlaytimePlayback() {
   }
 
   const pauseSpotifyPlayback = async (token: string) => {
-    if (!token) {
-      addDebugLog("⚠️ No token available for pause")
-      return
-    }
-
     addDebugLog("⏸️ === PAUSING SPOTIFY PLAYBACK ===")
+
     try {
+      // First attempt with provided token
+      let accessToken = token
+
+      // If no token provided, try to get a fresh one
+      if (!accessToken) {
+        addDebugLog("⚠️ No token provided, fetching fresh token...")
+        const tokenResponse = await fetch('/api/spotify/token')
+        if (!tokenResponse.ok) {
+          addDebugLog("❌ Failed to get Spotify token for pause")
+          return
+        }
+        const tokenData = await tokenResponse.json()
+        accessToken = tokenData.access_token
+      }
+
       const response = await fetch("https://api.spotify.com/v1/me/player/pause", {
         method: "PUT",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${accessToken}`,
         },
       })
 
       if (response.ok || response.status === 204) {
         addDebugLog("✅ Spotify playback paused successfully")
+      } else if (response.status === 401) {
+        // Token expired, retry with fresh token
+        addDebugLog("⚠️ Token expired (401), retrying with fresh token...")
+        const tokenResponse = await fetch('/api/spotify/token')
+        if (!tokenResponse.ok) {
+          addDebugLog("❌ Failed to refresh Spotify token")
+          return
+        }
+        const tokenData = await tokenResponse.json()
+
+        const retryResponse = await fetch("https://api.spotify.com/v1/me/player/pause", {
+          method: "PUT",
+          headers: {
+            Authorization: `Bearer ${tokenData.access_token}`,
+          },
+        })
+
+        if (retryResponse.ok || retryResponse.status === 204) {
+          addDebugLog("✅ Spotify paused successfully after token refresh")
+        } else {
+          const errorText = await retryResponse.text()
+          addDebugLog(`❌ Pause failed even after refresh: ${retryResponse.status} - ${errorText}`)
+        }
       } else {
         const errorText = await response.text()
         addDebugLog(`⚠️ Pause response: ${response.status} - ${errorText}`)
@@ -1187,12 +1231,14 @@ export default function PlaytimePlayback() {
   // Cleanup: pause Spotify when component unmounts or user navigates away
   useEffect(() => {
     return () => {
-      if (spotifyAccessToken && isHost && playbackStarted) {
-        addDebugLog("🧹 Component unmounting - pausing Spotify playback")
-        pauseSpotifyPlayback(spotifyAccessToken)
+      // Always try to pause on unmount, even if token/host checks fail
+      // The pauseSpotifyPlayback function will handle token refresh
+      if (isHost && playbackStarted) {
+        console.log("🧹 Component unmounting - pausing Spotify playback")
+        pauseSpotifyPlayback(spotifyAccessToken || '')
       }
     }
-  }, [spotifyAccessToken, isHost, playbackStarted])
+  }, [isHost, playbackStarted, spotifyAccessToken])
 
   useEffect(() => {
     if (!gameCode) return
@@ -1510,7 +1556,7 @@ export default function PlaytimePlayback() {
 
   if (isLoadingPlayer) {
     return (
-      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
         {/* Added debug panel to loading screen */}
         {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
           <div
@@ -1525,11 +1571,12 @@ export default function PlaytimePlayback() {
             ))}
           </div>
         )}
-        <div className="text-center max-w-md">
-          <div className="text-2xl font-bold mb-2">Loading player...</div>
-          <div className="text-lg text-white/70 mb-4">Please wait (Attempt {retryCount + 1} of 10)</div>
-          <div className="text-sm text-white/50 mb-6">Waiting for players to finish songs...</div>
-          <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin mx-auto" />
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading next song...</p>
+          {retryCount > 0 && (
+            <p className="text-white/60 text-sm mt-2">Attempt {retryCount + 1} of 10</p>
+          )}
         </div>
       </div>
     )
@@ -1579,6 +1626,18 @@ export default function PlaytimePlayback() {
               Retry
             </button>
           </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Show transition state immediately when navigating away
+  if (isTransitioning) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Moving to rankings...</p>
         </div>
       </div>
     )

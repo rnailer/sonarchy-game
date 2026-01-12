@@ -33,12 +33,19 @@ export default function PlaytimeNameVote() {
   const [voteResult, setVoteResult] = useState<"hide" | "show" | null>(null)
   const [isSavingVote, setIsSavingVote] = useState(false)
   const timerStartedRef = useRef(false)
+  const hasHandledExpiration = useRef(false)
 
   // Server-synchronized timer
   const { timeRemaining, isExpired, startTimer } = useServerTimer({
     gameId: gameId || "",
     timerType: "name_vote",
     onExpire: () => {
+      if (hasHandledExpiration.current) {
+        console.log("[v0] ⏰ Timer expiration already handled, skipping")
+        return
+      }
+      hasHandledExpiration.current = true
+
       const result = showVotes > hideVotes ? "show" : "hide"
       setVoteResult(result)
       setShowOverlay(true)

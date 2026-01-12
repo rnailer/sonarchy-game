@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { useServerTimer } from "@/lib/hooks/use-server-timer"
 import { usePhaseSync } from '@/lib/hooks/use-phase-sync'
-import { setGamePhase } from '@/lib/game-phases'
+import { setGamePhase, getCurrentPhase } from '@/lib/game-phases'
 
 const SHOW_DEBUG = false
 
@@ -58,6 +58,7 @@ export default function PlayersLockedIn() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
+  const [currentRound, setCurrentRound] = useState<number>(1)
   const [isHost, setIsHost] = useState(false)
   const [hostName, setHostName] = useState("")
   const [isStarting, setIsStarting] = useState(false)
@@ -69,6 +70,7 @@ export default function PlayersLockedIn() {
     gameCode: gameCode || "",
     gameId: gameId || "",
     expectedPhase: ['song_selection', 'players_locked_in'],
+    expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
 
@@ -98,12 +100,13 @@ export default function PlayersLockedIn() {
     const loadGameData = async () => {
       const { data: game } = await supabase
         .from("games")
-        .select("id, host_user_id")
+        .select("id, host_user_id, current_round")
         .eq("game_code", gameCode)
         .single()
 
       if (game) {
         setGameId(game.id)
+        setCurrentRound(game.current_round || 1)
 
         // Check if current user is host
         const { data: { user } } = await supabase.auth.getUser()
@@ -202,7 +205,19 @@ export default function PlayersLockedIn() {
     console.log("[v0] Host starting playback...")
 
     try {
-      // Transition to playback phase
+      // First, ensure we're at players_locked_in phase
+      // This handles the case where timer expiration didn't properly transition
+      const currentPhaseResult = await getCurrentPhase(gameCode)
+      console.log("[v0] Current phase:", currentPhaseResult)
+
+      if (currentPhaseResult === 'song_selection') {
+        console.log("[v0] Phase still at song_selection, transitioning to players_locked_in first")
+        await setGamePhase(gameId, 'players_locked_in')
+        console.log("[v0] ✅ Phase set to players_locked_in")
+      }
+
+      // Now transition to playback
+      console.log("[v0] Transitioning to playback")
       await setGamePhase(gameId, 'playback')
       console.log("[v0] ✅ Phase set to playback")
 
