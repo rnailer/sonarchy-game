@@ -128,10 +128,20 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
         return
       } else {
         // Same round - use phase order comparison
-        const currentIndex = PHASE_ORDER.indexOf(phase)
-        const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
-        playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
-        playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+
+        // Special case: ranking → playback is VALID (next song starting)
+        // This is NOT a backwards transition
+        if (primaryExpectedPhase === 'ranking' && phase === 'playback') {
+          console.log(`[PhaseSync] 🎵 ranking → playback: Next song starting, redirecting forward`)
+          playerIsBehind = true  // Treat as "behind" so redirect happens
+          playerIsAhead = false
+        } else {
+          // Normal phase order comparison
+          const currentIndex = PHASE_ORDER.indexOf(phase)
+          const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
+          playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+          playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+        }
       }
 
       if (timeSinceMount < 500 && !playerIsBehind) {
@@ -244,10 +254,20 @@ export function usePhaseSync(options: UsePhaseSyncOptions): UsePhaseSyncReturn {
               return
             } else {
               // Same round - use phase order comparison
-              const currentIndex = PHASE_ORDER.indexOf(newPhase)
-              const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
-              playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
-              playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+
+              // Special case: ranking → playback is VALID (next song starting)
+              // This is NOT a backwards transition
+              if (primaryExpectedPhase === 'ranking' && newPhase === 'playback') {
+                console.log(`[PhaseSync] 🎵 ranking → playback: Next song starting, redirecting forward`)
+                playerIsBehind = true  // Treat as "behind" so redirect happens
+                playerIsAhead = false
+              } else {
+                // Normal phase order comparison
+                const currentIndex = PHASE_ORDER.indexOf(newPhase)
+                const expectedIndex = PHASE_ORDER.indexOf(primaryExpectedPhase)
+                playerIsBehind = currentIndex > expectedIndex && expectedIndex >= 0 && !isOnValidPhase
+                playerIsAhead = currentIndex < expectedIndex && currentIndex >= 0 && !isOnValidPhase
+              }
             }
 
             if (timeSinceMount < 500 && !playerIsBehind) {

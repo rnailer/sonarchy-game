@@ -44,13 +44,22 @@ export default function Leaderboard() {
   const [songsWithUri, setSongsWithUri] = useState<any[]>([])
 
   // Phase sync for ranking/leaderboard
+  // Accept both 'ranking' and 'playback' - playback means next song started
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
     gameCode: gameCode || "",
     gameId: gameId || "",
-    expectedPhase: 'ranking',
+    expectedPhase: ['ranking', 'playback'],
     expectedRound: currentRound,
     disabled: !gameCode || !gameId
   })
+
+  // Detect when next song starts and navigate to playback
+  useEffect(() => {
+    if (currentPhase === 'playback' && gameCode) {
+      console.log("[v0] 🎵 Next song starting - navigating to playback")
+      router.push(`/playtime-playback?code=${gameCode}`)
+    }
+  }, [currentPhase, gameCode, router])
 
   // REMOVED: Phase should be set BEFORE navigation, not on page load
   // Pages should not set their own phase - it conflicts with phase sync
