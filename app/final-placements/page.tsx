@@ -81,9 +81,10 @@ function FinalPlacementsContent() {
   const [timerLoaded, setTimerLoaded] = useState(false)
   const [playersLoaded, setPlayersLoaded] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false) // NEW: Immediate loading state
+  const [minLoadComplete, setMinLoadComplete] = useState(false) // Minimum load time to prevent flash
 
   // Master loading state - only show content when everything is ready
-  const isFullyLoaded = playersLoaded && timerLoaded
+  const isFullyLoaded = playersLoaded && timerLoaded && minLoadComplete
 
   // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
   useEffect(() => {
@@ -91,6 +92,12 @@ function FinalPlacementsContent() {
       setTimerLoaded(true)
     }
   }, [timeRemaining, timerLoaded])
+
+  // Minimum load time to prevent flash on double-navigation
+  useEffect(() => {
+    const timer = setTimeout(() => setMinLoadComplete(true), 200)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     const loadPlayers = async () => {
