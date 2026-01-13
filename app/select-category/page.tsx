@@ -74,6 +74,19 @@ function getRandomCategories(count = 10) {
   return shuffled.slice(0, count)
 }
 
+const getAvatarImage = (avatarId: string) => {
+  const avatarMap: Record<string, string> = {
+    vinyl: "/vinyl-deck-sq.png",
+    jukebox: "/jukebox-sq.png",
+    mp3: "/mp3-player.png",
+    cassette: "/sg-casette.png",
+    minidisc: "/midi-sq.png",
+    boombox: "/beatbox-sq.png",
+    walkman: "/walkman.png",
+  }
+  return avatarMap[avatarId] || "/music-cloud-sq.png"
+}
+
 export default function SelectCategory() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -514,9 +527,9 @@ export default function SelectCategory() {
                 {pickerAvatar && (
                   <div className="w-16 h-16 rounded-full overflow-hidden mb-2 border-2 border-white/20">
                     <img
-                      src={`/${pickerAvatar}-sq.png`}
+                      src={getAvatarImage(pickerAvatar)}
                       alt={pickerName}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       onError={(e) => {
                         e.currentTarget.style.display = 'none'
                       }}
