@@ -86,6 +86,12 @@ export default function SelectCategory() {
   const playerName = searchParams.get("playerName") || "Player"
   const playerAvatar = searchParams.get("avatar") || "vinyl"
 
+  // Helper function to get ordinal for round number
+  const getOrdinal = (n: number): string => {
+    const ordinals = ['', 'FIRST', 'SECOND', 'THIRD', 'FOURTH', 'FIFTH']
+    return ordinals[n] || `ROUND ${n}`
+  }
+
   const [gameId, setGameId] = useState<string>("")
   const [currentRound, setCurrentRound] = useState<number>(1)
   const [categoryInput, setCategoryInput] = useState("")
@@ -94,6 +100,7 @@ export default function SelectCategory() {
   const [isMuted, setIsMuted] = useState(false)
   const [isPicker, setIsPicker] = useState<boolean>(false)
   const [pickerName, setPickerName] = useState<string>("")
+  const [pickerAvatar, setPickerAvatar] = useState<string | null>(null)
   // TODO: Add host-only sounds later
   // const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
@@ -203,16 +210,17 @@ export default function SelectCategory() {
         const isThisPlayerPicker = game.next_category_picker_id === myPlayerId
         setIsPicker(isThisPlayerPicker)
 
-        // Fetch picker's name for display
+        // Fetch picker's name and avatar for display
         if (game.next_category_picker_id) {
           const { data: pickerPlayer } = await supabase
             .from("game_players")
-            .select("player_name")
+            .select("player_name, avatar_id")
             .eq("id", game.next_category_picker_id)
             .single()
 
           if (pickerPlayer) {
             setPickerName(pickerPlayer.player_name)
+            setPickerAvatar(pickerPlayer.avatar_id)
           }
         }
 
@@ -424,6 +432,133 @@ export default function SelectCategory() {
         }
       }
     }
+  }
+
+  // Show waiting view for non-pickers
+  if (!isPicker && pickerName && gameId) {
+    const ordinal = getOrdinal(currentRound || 1)
+    const ordinalLower = ordinal.toLowerCase()
+
+    return (
+      <div className="min-h-screen bg-[#000022] text-white flex flex-col">
+        {/* Header */}
+        <header className="pt-12 pb-6 px-6 text-center">
+          <h1
+            className="text-2xl font-black tracking-wide"
+            style={{
+              background: "linear-gradient(to right, #00D4FF, #00F0FF)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
+            {ordinal} CATEGORY...
+          </h1>
+        </header>
+
+        {/* Main content card */}
+        <div
+          className="flex-1 mx-4 rounded-t-3xl flex flex-col items-center px-6 pt-8"
+          style={{
+            background: "linear-gradient(to bottom, #0D113B, #000022)",
+            borderTop: "2px solid rgba(0, 212, 255, 0.3)",
+          }}
+        >
+          <p className="text-white/80 text-center text-lg mb-8">
+            The {ordinalLower} music category is being<br />hand crafted by...
+          </p>
+
+          {/* Timer circle with avatar */}
+          <div className="relative flex items-center justify-center mb-4">
+            {/* Outer decorative ring */}
+            <div
+              className="absolute w-72 h-72 rounded-full"
+              style={{
+                border: "1px solid rgba(255, 255, 255, 0.1)",
+              }}
+            />
+
+            {/* Progress ring background */}
+            <div
+              className="relative w-64 h-64 rounded-full flex items-center justify-center"
+              style={{
+                background: "#262C87",
+              }}
+            >
+              {/* SVG Progress Ring */}
+              <svg className="absolute w-full h-full -rotate-90">
+                <circle
+                  cx="128"
+                  cy="128"
+                  r="120"
+                  fill="none"
+                  stroke="rgba(255, 255, 255, 0.1)"
+                  strokeWidth="4"
+                />
+                <circle
+                  cx="128"
+                  cy="128"
+                  r="120"
+                  fill="none"
+                  stroke="#FFD700"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeDasharray={2 * Math.PI * 120}
+                  strokeDashoffset={2 * Math.PI * 120 * (1 - (timeRemaining || 0) / 60)}
+                  style={{ transition: "stroke-dashoffset 1s linear" }}
+                />
+              </svg>
+
+              {/* Inner content */}
+              <div className="flex flex-col items-center justify-center z-10">
+                {/* Avatar */}
+                {pickerAvatar && (
+                  <div className="w-16 h-16 rounded-full overflow-hidden mb-2 border-2 border-white/20">
+                    <img
+                      src={`/${pickerAvatar}-sq.png`}
+                      alt={pickerName}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.style.display = 'none'
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Timer */}
+                <div
+                  className="text-6xl font-black"
+                  style={{
+                    color: "white",
+                    textShadow: "2px 2px 4px rgba(0,0,0,0.5)"
+                  }}
+                >
+                  {Math.floor((timeRemaining || 0) / 60)}:{String((timeRemaining || 0) % 60).padStart(2, '0')}
+                </div>
+
+                {/* Picker name */}
+                <p className="text-white text-xl font-semibold mt-2">
+                  {pickerName}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chat button */}
+        <div className="px-6 pb-8 pt-4">
+          <button
+            onClick={() => {/* TODO: Open chat */}}
+            className="w-full py-4 rounded-full text-white font-semibold"
+            style={{
+              background: "rgba(255, 255, 255, 0.1)",
+              border: "1px solid rgba(255, 255, 255, 0.2)",
+            }}
+          >
+            Tired of waiting? Lets chat 💬
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
