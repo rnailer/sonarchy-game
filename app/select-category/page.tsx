@@ -6,7 +6,7 @@ const SHOW_DEBUG = false
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
-import { ArrowLeft, Volume2, VolumeX } from "lucide-react"
+import { ArrowLeft, Volume2, VolumeX, MessageCircle, Send, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { createClient } from "@/lib/supabase/client"
 import { getGameState } from "@/lib/game-state"
@@ -114,6 +114,10 @@ export default function SelectCategory() {
   const [isPicker, setIsPicker] = useState<boolean>(false)
   const [pickerName, setPickerName] = useState<string>("")
   const [pickerAvatar, setPickerAvatar] = useState<string | null>(null)
+  const [showChat, setShowChat] = useState(false)
+  const [chatMessages, setChatMessages] = useState<{id: string, player_name: string, message: string, created_at: string}[]>([])
+  const [newMessage, setNewMessage] = useState("")
+  const chatEndRef = useRef<HTMLDivElement>(null)
   // TODO: Add host-only sounds later
   // const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
@@ -383,6 +387,48 @@ export default function SelectCategory() {
     }
   }, [gameId, startTimer, presetCategories.length])
 
+  // Chat subscription
+  useEffect(() => {
+    if (!gameId) return
+
+    const fetchMessages = async () => {
+      const { data } = await supabase
+        .from("chat_messages")
+        .select("*")
+        .eq("game_id", gameId)
+        .order("created_at", { ascending: true })
+
+      if (data) setChatMessages(data)
+    }
+
+    fetchMessages()
+
+    const channel = supabase
+      .channel(`chat-${gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_messages',
+          filter: `game_id=eq.${gameId}`
+        },
+        (payload) => {
+          setChatMessages(prev => [...prev, payload.new as any])
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [gameId, supabase])
+
+  // Auto-scroll chat
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [chatMessages])
+
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60)
     const secs = seconds % 60
@@ -390,6 +436,20 @@ export default function SelectCategory() {
   }
 
   const progressPercentage = (timeRemaining / 60) * 100
+
+  const sendChatMessage = async () => {
+    if (!newMessage.trim() || !gameId || !gameCode) return
+
+    const playerNameFromStorage = localStorage.getItem(`player_name_${gameCode}`) || playerName
+
+    await supabase.from("chat_messages").insert({
+      game_id: gameId,
+      player_name: playerNameFromStorage,
+      message: newMessage.trim()
+    })
+
+    setNewMessage("")
+  }
 
   const handleLockIn = async () => {
     // Only the picker can lock in a category
@@ -445,6 +505,85 @@ export default function SelectCategory() {
         }
       }
     }
+  }
+
+  // Show countdown overlay for ALL players when category is selected
+  if (showCountdown) {
+    return (
+      <div
+        className="fixed inset-0 z-[100] flex flex-col items-center justify-center"
+        style={{
+          background: "#000022",
+        }}
+      >
+        <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-center px-3 pb-4">
+          <h1
+            className="text-[22px] font-black text-center bg-clip-text text-transparent"
+            style={{
+              backgroundImage: "linear-gradient(to bottom left, #8BE1FF, #0D91EA)",
+            }}
+          >
+            the category is...
+          </h1>
+        </header>
+
+        <div
+          className="flex-1 flex flex-col items-start mt-[140px] w-full relative"
+          style={{
+            borderTopLeftRadius: "24px",
+            borderTopRightRadius: "24px",
+            borderTop: "3px solid rgb(185, 243, 255)",
+            background: "#0D113B",
+            paddingLeft: "36px",
+            paddingRight: "36px",
+            paddingTop: "36px",
+          }}
+        >
+          <h2
+            className="text-[36px] font-extrabold text-center mb-12 leading-tight w-full bg-clip-text text-transparent"
+            style={{
+              backgroundImage: "linear-gradient(to right, #FFF1AB, #DC9C00)",
+            }}
+          >
+            {selectedCategory || "Loading..."}
+          </h2>
+
+          <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center" style={{ top: "206px" }}>
+            <div
+              className="relative flex items-center justify-center"
+              style={{
+                width: "280px",
+                height: "280px",
+                background: "#262C87",
+                borderRadius: "50%",
+              }}
+            >
+              <div
+                className="flex items-center justify-center"
+                style={{
+                  width: "242px",
+                  height: "242px",
+                  background: "transparent",
+                  border: "1px solid #D8D8E0",
+                  borderRadius: "50%",
+                }}
+              >
+                <div
+                  className="font-extrabold text-center"
+                  style={{
+                    fontSize: "128px",
+                    color: "white",
+                    filter: "drop-shadow(4px 4px 0px #0D113B)",
+                  }}
+                >
+                  {countdown}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Show waiting view for non-pickers
@@ -560,7 +699,7 @@ export default function SelectCategory() {
         {/* Chat button */}
         <div className="px-6 pb-8 pt-4">
           <button
-            onClick={() => {/* TODO: Open chat */}}
+            onClick={() => setShowChat(true)}
             className="w-full py-4 rounded-full text-white font-semibold"
             style={{
               background: "rgba(255, 255, 255, 0.1)",
@@ -570,6 +709,48 @@ export default function SelectCategory() {
             Tired of waiting? Lets chat 💬
           </button>
         </div>
+
+        {/* Chat Panel */}
+        {showChat && (
+          <div className="fixed inset-0 z-50 bg-black/80 flex flex-col">
+            {/* Chat Header */}
+            <div className="flex items-center justify-between p-4 border-b border-white/20">
+              <h2 className="text-white text-lg font-bold">Chat</h2>
+              <button onClick={() => setShowChat(false)} className="text-white">
+                <X size={24} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {chatMessages.map((msg) => (
+                <div key={msg.id} className="bg-white/10 rounded-lg p-3">
+                  <p className="text-cyan-400 text-sm font-semibold">{msg.player_name}</p>
+                  <p className="text-white">{msg.message}</p>
+                </div>
+              ))}
+              <div ref={chatEndRef} />
+            </div>
+
+            {/* Input */}
+            <div className="p-4 border-t border-white/20 flex gap-2">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
+                placeholder="Type a message..."
+                className="flex-1 bg-white/10 text-white rounded-full px-4 py-3 outline-none"
+              />
+              <button
+                onClick={sendChatMessage}
+                className="bg-cyan-500 text-white rounded-full p-3"
+              >
+                <Send size={20} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -756,83 +937,6 @@ export default function SelectCategory() {
           {isPicker ? "Lock in your category" : `Waiting for ${pickerName}...`}
         </button>
       </div>
-
-      {/* Countdown overlay (shown to ALL players when category is selected) */}
-      {showCountdown && (
-        <div
-          className="fixed inset-0 z-[100] flex flex-col items-center justify-center"
-          style={{
-            background: "#000022",
-          }}
-        >
-          <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-center px-3 pb-4">
-            <h1
-              className="text-[22px] font-black text-center bg-clip-text text-transparent"
-              style={{
-                backgroundImage: "linear-gradient(to bottom left, #8BE1FF, #0D91EA)",
-              }}
-            >
-              the category is...
-            </h1>
-          </header>
-
-          <div
-            className="flex-1 flex flex-col items-start mt-[140px] w-full relative"
-            style={{
-              borderTopLeftRadius: "24px",
-              borderTopRightRadius: "24px",
-              borderTop: "3px solid rgb(185, 243, 255)",
-              background: "#0D113B",
-              paddingLeft: "36px",
-              paddingRight: "36px",
-              paddingTop: "36px",
-            }}
-          >
-            <h2
-              className="text-[36px] font-extrabold text-center mb-12 leading-tight w-full bg-clip-text text-transparent"
-              style={{
-                backgroundImage: "linear-gradient(to right, #FFF1AB, #DC9C00)",
-              }}
-            >
-              {selectedCategory || "Loading..."}
-            </h2>
-
-            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center" style={{ top: "206px" }}>
-              <div
-                className="relative flex items-center justify-center"
-                style={{
-                  width: "280px",
-                  height: "280px",
-                  background: "#262C87",
-                  borderRadius: "50%",
-                }}
-              >
-                <div
-                  className="flex items-center justify-center"
-                  style={{
-                    width: "242px",
-                    height: "242px",
-                    background: "transparent",
-                    border: "1px solid #D8D8E0",
-                    borderRadius: "50%",
-                  }}
-                >
-                  <div
-                    className="font-extrabold text-center"
-                    style={{
-                      fontSize: "128px",
-                      color: "white",
-                      filter: "drop-shadow(4px 4px 0px #0D113B)",
-                    }}
-                  >
-                    {countdown}
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

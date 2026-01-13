@@ -95,7 +95,7 @@ function FinalPlacementsContent() {
 
   // Minimum load time to prevent flash on double-navigation
   useEffect(() => {
-    const timer = setTimeout(() => setMinLoadComplete(true), 200)
+    const timer = setTimeout(() => setMinLoadComplete(true), 500)
     return () => clearTimeout(timer)
   }, [])
 
