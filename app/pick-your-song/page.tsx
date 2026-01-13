@@ -963,16 +963,13 @@ export default function PickYourSong() {
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder={countdown !== null ? "Wait for countdown..." : "Search..."}
-              disabled={countdown !== null}
+              placeholder="Search..."
               className="w-full text-white rounded-2xl px-4 pr-12 outline-none"
               style={{
                 background: "#000022",
                 border: "2px solid #C7D2FF",
                 fontSize: "16px",
                 height: "56px",
-                opacity: countdown !== null ? 0.5 : 1,
-                cursor: countdown !== null ? "not-allowed" : "text",
               }}
             />
             <Search className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#C7D2FF]" />
