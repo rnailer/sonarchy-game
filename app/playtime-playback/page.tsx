@@ -1646,10 +1646,10 @@ export default function PlaytimePlayback() {
   // CRITICAL: Don't render if wrong phase (prevents flicker during phase transitions)
   if (!isCorrectPhase && currentPhase) {
     return (
-      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-lg text-white/70">Navigating...</div>
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
         </div>
       </div>
     )
@@ -1658,7 +1658,7 @@ export default function PlaytimePlayback() {
   // CRITICAL: Don't render if player has no song (prevents flicker during navigation)
   if (!playerData || !playerData.song_uri) {
     return (
-      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center p-6">
         {/* Added debug panel to no player data screen */}
         {SHOW_DEBUG && showDebug && debugInfo.length > 0 && (
           <div
@@ -1673,9 +1673,9 @@ export default function PlaytimePlayback() {
             ))}
           </div>
         )}
-        <div className="text-center max-w-md">
-          <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <div className="text-lg text-white/70">Loading next song...</div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
         </div>
       </div>
     )

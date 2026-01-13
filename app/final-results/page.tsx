@@ -141,8 +141,11 @@ export default function FinalResults() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
+        </div>
       </div>
     )
   }

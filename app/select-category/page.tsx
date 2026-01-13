@@ -115,7 +115,7 @@ export default function SelectCategory() {
   const [pickerName, setPickerName] = useState<string>("")
   const [pickerAvatar, setPickerAvatar] = useState<string | null>(null)
   const [showChat, setShowChat] = useState(false)
-  const [chatMessages, setChatMessages] = useState<{id: string, player_name: string, message: string, created_at: string}[]>([])
+  const [chatMessages, setChatMessages] = useState<{id: string, player_id: string, player_name: string, player_avatar: string, message: string, created_at: string}[]>([])
   const [newMessage, setNewMessage] = useState("")
   const chatEndRef = useRef<HTMLDivElement>(null)
   // TODO: Add host-only sounds later
@@ -393,28 +393,46 @@ export default function SelectCategory() {
 
     const fetchMessages = async () => {
       const { data } = await supabase
-        .from("chat_messages")
+        .from("game_chat")
         .select("*")
         .eq("game_id", gameId)
         .order("created_at", { ascending: true })
 
-      if (data) setChatMessages(data)
+      if (data) {
+        const formattedMessages = data.map((msg: any) => ({
+          id: msg.id,
+          player_id: msg.player_id || "",
+          player_name: msg.player_name,
+          player_avatar: msg.player_avatar || "",
+          message: msg.message,
+          created_at: msg.created_at
+        }))
+        setChatMessages(formattedMessages)
+      }
     }
 
     fetchMessages()
 
     const channel = supabase
-      .channel(`chat-${gameId}`)
+      .channel(`game_${gameId}_chat`)
       .on(
         'postgres_changes',
         {
           event: 'INSERT',
           schema: 'public',
-          table: 'chat_messages',
+          table: 'game_chat',
           filter: `game_id=eq.${gameId}`
         },
         (payload) => {
-          setChatMessages(prev => [...prev, payload.new as any])
+          const newMessage = {
+            id: payload.new.id as string,
+            player_id: (payload.new.player_id as string) || "",
+            player_name: payload.new.player_name as string,
+            player_avatar: (payload.new.player_avatar as string) || "",
+            message: payload.new.message as string,
+            created_at: payload.new.created_at as string
+          }
+          setChatMessages(prev => [...prev, newMessage])
         }
       )
       .subscribe()
@@ -440,11 +458,15 @@ export default function SelectCategory() {
   const sendChatMessage = async () => {
     if (!newMessage.trim() || !gameId || !gameCode) return
 
+    const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
     const playerNameFromStorage = localStorage.getItem(`player_name_${gameCode}`) || playerName
+    const playerAvatarFromStorage = localStorage.getItem(`player_avatar_${gameCode}`) || ""
 
-    await supabase.from("chat_messages").insert({
+    await supabase.from("game_chat").insert({
       game_id: gameId,
+      player_id: myPlayerId,
       player_name: playerNameFromStorage,
+      player_avatar: playerAvatarFromStorage,
       message: newMessage.trim()
     })
 
@@ -712,42 +734,101 @@ export default function SelectCategory() {
 
         {/* Chat Panel */}
         {showChat && (
-          <div className="fixed inset-0 z-50 bg-black/80 flex flex-col">
+          <div className="fixed inset-0 z-50 flex flex-col" style={{ background: "#0D113B" }}>
             {/* Chat Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/20">
-              <h2 className="text-white text-lg font-bold">Chat</h2>
-              <button onClick={() => setShowChat(false)} className="text-white">
-                <X size={24} />
+            <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: "2px solid #262C87" }}>
+              <h2 className="text-white text-[22px] font-bold">Game chat</h2>
+              <button onClick={() => setShowChat(false)} className="text-white hover:opacity-70 transition-opacity">
+                <X size={28} />
               </button>
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
-              {chatMessages.map((msg) => (
-                <div key={msg.id} className="bg-white/10 rounded-lg p-3">
-                  <p className="text-cyan-400 text-sm font-semibold">{msg.player_name}</p>
-                  <p className="text-white">{msg.message}</p>
+            <div
+              ref={chatEndRef}
+              className="flex-1 overflow-y-auto px-6 space-y-3 pt-4 pb-4"
+            >
+              {chatMessages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-white/50">
+                  <p className="text-lg">No messages yet</p>
+                  <p className="text-sm mt-2">Be the first to say something!</p>
                 </div>
-              ))}
-              <div ref={chatEndRef} />
+              ) : (
+                chatMessages.map((msg) => {
+                  const msgAvatarImage = getAvatarImage(msg.player_avatar)
+                  const isEmojiOnly = /^[\p{Emoji}\s]+$/u.test(msg.message.trim())
+
+                  return (
+                    <div key={msg.id} className="flex items-start gap-3 flex-row-reverse w-full">
+                      <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                        <img
+                          src={msgAvatarImage || "/music-cloud-sq.png"}
+                          alt={msg.player_name}
+                          className="w-10 h-10 object-contain"
+                        />
+                      </div>
+
+                      {isEmojiOnly ? (
+                        <div className="flex-1 min-w-0 w-full">
+                          <div className="inline-block bg-transparent px-4 py-2 rounded-2xl w-full">
+                            <span className="text-[14px] font-medium" style={{ color: "#C7D2FF" }}>
+                              {msg.player_name} sent an emoji {msg.message}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex-1 min-w-0 w-full">
+                          <div
+                            className="inline-block rounded-2xl rounded-tr-none px-4 py-3 w-full"
+                            style={{ background: "#000022" }}
+                          >
+                            <div className="text-[14px] font-medium mb-1" style={{ color: "#C7D2FF" }}>
+                              {msg.player_name}
+                            </div>
+                            <div className="text-[14px]" style={{ color: "#FFF8C4" }}>
+                              {msg.message}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })
+              )}
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-white/20 flex gap-2">
-              <input
-                type="text"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && sendChatMessage()}
-                placeholder="Type a message..."
-                className="flex-1 bg-white/10 text-white rounded-full px-4 py-3 outline-none"
-              />
-              <button
-                onClick={sendChatMessage}
-                className="bg-cyan-500 text-white rounded-full p-3"
-              >
-                <Send size={20} />
-              </button>
+            <div className="px-6 py-4" style={{ borderTop: "2px solid #262C87" }}>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyPress={(e) => e.key === "Enter" && sendChatMessage()}
+                  placeholder="Send a message"
+                  className="flex-1 min-w-0 text-white rounded-2xl px-4 py-3 outline-none"
+                  style={{
+                    background: "#000022",
+                    border: "2px solid #D2FFFF",
+                  }}
+                />
+                <button
+                  onClick={sendChatMessage}
+                  className="flex items-center justify-center flex-shrink-0"
+                  style={{
+                    width: "48px",
+                    height: "48px",
+                    borderRadius: "16px",
+                    border: "2px solid #D0F5E5",
+                    background: "#14B8A6",
+                    boxShadow: "0px 4px 0px 0px #0D9488",
+                  }}
+                >
+                  <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         )}

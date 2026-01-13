@@ -257,12 +257,22 @@ function FinalPlacementsContent() {
 
     console.log("[v0] ✅ Saved placements for round", currentRound)
 
+    // CRITICAL: Fetch fresh player count from database to determine if game should end
+    // This ensures we count ALL players, not just players with songs
+    const { data: allPlayersForCheck } = await supabase
+      .from("game_players")
+      .select("id")
+      .eq("game_id", gameId)
+
+    const actualTotalPlayers = allPlayersForCheck?.length || 0
+
     // Check if game should end
     console.log("[v0] 📊 Current round:", currentRound)
-    console.log("[v0] 📊 Total players:", totalPlayers)
-    console.log("[v0] 🔍 Game should end if:", `${currentRound} >= ${totalPlayers}`)
+    console.log("[v0] 📊 Total players (from state):", totalPlayers)
+    console.log("[v0] 📊 Total players (fresh from DB):", actualTotalPlayers)
+    console.log("[v0] 🔍 Game should end if:", `${currentRound} >= ${actualTotalPlayers}`)
 
-    if (currentRound >= totalPlayers) {
+    if (currentRound >= actualTotalPlayers) {
       // Game complete - go to final results
       console.log("[v0] 🎉 GAME COMPLETE! Going to final results")
 
@@ -531,8 +541,11 @@ function FinalPlacementsContent() {
   // Show loading spinner until everything is ready (prevents flicker)
   if (!isFullyLoaded) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-[#000022]">
-        <div className="w-8 h-8 border-2 border-white border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
+        </div>
       </div>
     )
   }
@@ -746,8 +759,11 @@ function FinalPlacementsContent() {
 export default function FinalPlacements() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-[#000022] text-white flex items-center justify-center">
-        <div className="w-16 h-16 border-4 border-[#8BE1FF] border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading...</p>
+        </div>
       </div>
     }>
       <FinalPlacementsContent />
