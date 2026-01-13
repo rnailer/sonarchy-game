@@ -55,7 +55,8 @@ export default function PlayersLockedIn() {
   const gameCode = searchParams.get("code")
 
   const [isMuted, setIsMuted] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // TODO: Add host-only sounds later
+  // const audioRef = useRef<HTMLAudioElement | null>(null)
   const [players, setPlayers] = useState<Player[]>([])
   const [gameId, setGameId] = useState<string | null>(null)
   const [currentRound, setCurrentRound] = useState<number>(1)
@@ -184,19 +185,20 @@ export default function PlayersLockedIn() {
     }
   }, [gameCode, supabase])
 
-  useEffect(() => {
-    audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
-    audioRef.current.loop = true
-    audioRef.current.volume = isMuted ? 0 : 0.5
-    audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
+  //   audioRef.current.loop = true
+  //   audioRef.current.volume = isMuted ? 0 : 0.5
+  //   audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
 
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
+  //   return () => {
+  //     if (audioRef.current) {
+  //       audioRef.current.pause()
+  //       audioRef.current = null
+  //     }
+  //   }
+  // }, [])
 
   const handleStartPlayback = async () => {
     if (!gameId || !gameCode || isStarting) return

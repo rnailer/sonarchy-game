@@ -70,7 +70,9 @@ function FinalPlacementsContent() {
     timerType: "final_placements",
     enabled: !!gameId,
     onExpire: () => {
-      console.log("[v0] ⏰ Timer reached 0, calling handleSubmit")
+      console.log("[v0] ⏰ Timer reached 0, showing loading and calling handleSubmit")
+      // IMMEDIATELY show loading state before any async work
+      setIsNavigating(true)
       handleSubmitRef.current?.()
     },
   })
@@ -78,6 +80,7 @@ function FinalPlacementsContent() {
   // Track loading states to prevent flicker
   const [timerLoaded, setTimerLoaded] = useState(false)
   const [playersLoaded, setPlayersLoaded] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false) // NEW: Immediate loading state
 
   // Master loading state - only show content when everything is ready
   const isFullyLoaded = playersLoaded && timerLoaded
@@ -504,6 +507,18 @@ function FinalPlacementsContent() {
 
   const getPlayerColorIndex = (playerId: string) => {
     return players.findIndex((p) => p.id === playerId)
+  }
+
+  // Show loading state immediately when navigating
+  if (isNavigating) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500 mx-auto mb-4" />
+          <p className="text-white text-xl">Loading next phase...</p>
+        </div>
+      </div>
+    )
   }
 
   // Show loading spinner until everything is ready (prevents flicker)

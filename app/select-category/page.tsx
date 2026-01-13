@@ -94,10 +94,16 @@ export default function SelectCategory() {
   const [isMuted, setIsMuted] = useState(false)
   const [isPicker, setIsPicker] = useState<boolean>(false)
   const [pickerName, setPickerName] = useState<string>("")
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // TODO: Add host-only sounds later
+  // const audioRef = useRef<HTMLAudioElement | null>(null)
   const supabase = createClient()
   const timerStartedRef = useRef(false)
   const hasHandledExpiration = useRef(false)
+  const [showCountdown, setShowCountdown] = useState(false)
+  const [countdown, setCountdown] = useState<number | "GO">(3)
+  const [selectedCategory, setSelectedCategory] = useState<string>("")
+  // TODO: Add host-only sounds later
+  // const countdownAudioRef = useRef<HTMLAudioElement | null>(null)
 
   const [debugInfo, setDebugInfo] = useState<string[]>([])
   const [showDebug, setShowDebug] = useState(true)
@@ -156,12 +162,15 @@ export default function SelectCategory() {
             }).eq("id", myPlayerId)
           }
 
-          // Transition to song_selection phase
-          if (gameId) {
-            addDebug(`⏰ Time's up! Auto-selected: ${randomPreset.text}`)
-            await setGamePhase(gameId, 'song_selection')
-            // Phase sync will auto-redirect all players to /pick-your-song
-          }
+          // Show countdown to all players (via database subscription)
+          // Phase transition will happen AFTER countdown in countdown effect
+          addDebug(`⏰ Time's up! Auto-selected: ${randomPreset.text}`)
+          addDebug(`🎬 Countdown will trigger for all players via subscription`)
+
+          // Also trigger countdown for the picker (who just auto-selected)
+          setSelectedCategory(randomPreset.text)
+          setShowCountdown(true)
+          setCountdown(3)
         }
       }
     },
@@ -223,25 +232,120 @@ export default function SelectCategory() {
     checkCategoryStatus()
   }, [gameCode, supabase, router])
 
+  // Subscribe to category selection for countdown (ALL players)
   useEffect(() => {
-    audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
-    audioRef.current.loop = true
-    audioRef.current.volume = isMuted ? 0 : 0.5
-    audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
+    if (!gameId || !gameCode) return
+
+    console.log("[v0] Setting up category selection subscription for all players")
+
+    const channel = supabase
+      .channel(`category-selection-${gameId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'games',
+          filter: `id=eq.${gameId}`
+        },
+        async (payload) => {
+          const newCategory = payload.new.current_category
+          const oldCategory = payload.old.current_category
+
+          // Category was just selected
+          if (newCategory && newCategory !== oldCategory) {
+            console.log("[v0] 🎯 Category selected:", newCategory)
+            addDebug(`🎯 Category selected: ${newCategory}`)
+
+            // TODO: Add host-only sounds later
+            // Stop the ticking clock sound
+            // if (audioRef.current) {
+            //   audioRef.current.pause()
+            //   audioRef.current = null
+            // }
+
+            // Show countdown overlay with the selected category
+            setSelectedCategory(newCategory)
+            setShowCountdown(true)
+            setCountdown(3)
+
+            // TODO: Add host-only sounds later
+            // Play countdown sound after a brief delay
+            // setTimeout(() => {
+            //   countdownAudioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-bit%20Countdown%20D-q2pOCsVe8lEbv9dXtvx4WMLm1hyxOx.wav")
+            //   countdownAudioRef.current.loop = false
+            //   countdownAudioRef.current.volume = isMuted ? 0 : 1
+            //   countdownAudioRef.current.play().catch((e) => console.log("[v0] Countdown audio play failed:", e))
+            // }, 1000)
+          }
+        }
+      )
+      .subscribe()
 
     return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
+      console.log("[v0] Cleaning up category selection subscription")
+      supabase.removeChannel(channel)
     }
-  }, [])
+  }, [gameId, gameCode, supabase, isMuted])
 
+  // Countdown timer effect
   useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : 0.5
+    if (!showCountdown) return
+
+    if (countdown === 3 || countdown === 2 || countdown === 1) {
+      const timer = setTimeout(() => {
+        setCountdown(countdown === 3 ? 2 : countdown === 2 ? 1 : "GO")
+      }, 1000)
+      return () => clearTimeout(timer)
+    } else if (countdown === "GO") {
+      // After showing "GO", set phase and navigate to pick-your-song
+      const timer = setTimeout(async () => {
+        console.log("[v0] Countdown finished, setting phase and navigating to pick-your-song")
+
+        // Set phase to song_selection AFTER countdown
+        if (gameId) {
+          console.log("[v0] Setting phase to song_selection after countdown")
+          await setGamePhase(gameId, 'song_selection')
+          console.log("[v0] Phase transition complete")
+        }
+
+        // Fetch the current category from the database
+        const { data } = await supabase
+          .from("games")
+          .select("current_category")
+          .eq("game_code", gameCode)
+          .single()
+
+        if (data?.current_category) {
+          const targetUrl = `/pick-your-song?code=${gameCode}&category=${encodeURIComponent(data.current_category)}`
+          router.push(targetUrl)
+        }
+      }, 1000)
+      return () => clearTimeout(timer)
     }
-  }, [isMuted])
+  }, [showCountdown, countdown, gameCode, gameId, router, supabase])
+
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
+  //   audioRef.current.loop = true
+  //   audioRef.current.volume = isMuted ? 0 : 0.5
+  //   audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
+
+  //   return () => {
+  //     if (audioRef.current) {
+  //       audioRef.current.pause()
+  //       audioRef.current = null
+  //     }
+  //   }
+  // }, [])
+
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   if (audioRef.current) {
+  //     audioRef.current.volume = isMuted ? 0 : 0.5
+  //   }
+  // }, [isMuted])
 
   // Start the server timer once gameId is available
   useEffect(() => {
@@ -281,6 +385,14 @@ export default function SelectCategory() {
         const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
 
         if (game) {
+          // TODO: Add host-only sounds later
+          // Stop the ticking clock sound
+          // if (audioRef.current) {
+          //   audioRef.current.pause()
+          //   audioRef.current = null
+          // }
+
+          // Update category in database (this triggers subscription for all players)
           await supabase.from("games").update({ current_category: category }).eq("id", game.id)
           addDebug("✅ Updated game category")
 
@@ -293,16 +405,24 @@ export default function SelectCategory() {
             addDebug("✅ Marked as selected and as category picker")
           }
 
-          // NEW: Transition to song_selection phase
-          if (gameId) {
-            addDebug(`Setting phase to song_selection`)
-            await setGamePhase(gameId, 'song_selection')
-          }
+          // Show countdown overlay for picker too
+          setSelectedCategory(category)
+          setShowCountdown(true)
+          setCountdown(3)
+
+          // TODO: Add host-only sounds later
+          // Play countdown sound after a brief delay
+          // setTimeout(() => {
+          //   countdownAudioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-bit%20Countdown%20D-q2pOCsVe8lEbv9dXtvx4WMLm1hyxOx.wav")
+          //   countdownAudioRef.current.loop = false
+          //   countdownAudioRef.current.volume = isMuted ? 0 : 1
+          //   countdownAudioRef.current.play().catch((e) => console.log("[v0] Countdown audio play failed:", e))
+          // }, 1000)
+
+          // Phase transition moved to countdown effect - happens AFTER countdown finishes
+          // This prevents PhaseSync from redirecting before the countdown completes
         }
       }
-
-      // KEEP existing navigation as fallback
-      router.push(`/category-selected?category=${encodeURIComponent(category)}&code=${gameCode}`)
     }
   }
 
@@ -488,6 +608,83 @@ export default function SelectCategory() {
           {isPicker ? "Lock in your category" : `Waiting for ${pickerName}...`}
         </button>
       </div>
+
+      {/* Countdown overlay (shown to ALL players when category is selected) */}
+      {showCountdown && (
+        <div
+          className="fixed inset-0 z-[100] flex flex-col items-center justify-center"
+          style={{
+            background: "#000022",
+          }}
+        >
+          <header className="fixed top-[72px] left-0 right-0 z-50 flex items-center justify-center px-3 pb-4">
+            <h1
+              className="text-[22px] font-black text-center bg-clip-text text-transparent"
+              style={{
+                backgroundImage: "linear-gradient(to bottom left, #8BE1FF, #0D91EA)",
+              }}
+            >
+              the category is...
+            </h1>
+          </header>
+
+          <div
+            className="flex-1 flex flex-col items-start mt-[140px] w-full relative"
+            style={{
+              borderTopLeftRadius: "24px",
+              borderTopRightRadius: "24px",
+              borderTop: "3px solid rgb(185, 243, 255)",
+              background: "#0D113B",
+              paddingLeft: "36px",
+              paddingRight: "36px",
+              paddingTop: "36px",
+            }}
+          >
+            <h2
+              className="text-[36px] font-extrabold text-center mb-12 leading-tight w-full bg-clip-text text-transparent"
+              style={{
+                backgroundImage: "linear-gradient(to right, #FFF1AB, #DC9C00)",
+              }}
+            >
+              {selectedCategory || "Loading..."}
+            </h2>
+
+            <div className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center" style={{ top: "206px" }}>
+              <div
+                className="relative flex items-center justify-center"
+                style={{
+                  width: "280px",
+                  height: "280px",
+                  background: "#262C87",
+                  borderRadius: "50%",
+                }}
+              >
+                <div
+                  className="flex items-center justify-center"
+                  style={{
+                    width: "242px",
+                    height: "242px",
+                    background: "transparent",
+                    border: "1px solid #D8D8E0",
+                    borderRadius: "50%",
+                  }}
+                >
+                  <div
+                    className="font-extrabold text-center"
+                    style={{
+                      fontSize: "128px",
+                      color: "white",
+                      filter: "drop-shadow(4px 4px 0px #0D113B)",
+                    }}
+                  >
+                    {countdown}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

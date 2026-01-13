@@ -49,6 +49,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
   const [isExpired, setIsExpired] = useState(false)
   const [timerVersion, setTimerVersion] = useState(0) // Increment to trigger re-fetch
   const onExpireRef = useRef(onExpire)
+  const hasCalledOnExpire = useRef(false) // Track if we've called onExpire
 
   // Keep onExpire ref up to date
   useEffect(() => {
@@ -129,6 +130,9 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
     console.log(`[ServerTimer] ✅ Started ${timerType} timer for ${duration}s at ${now}`)
     console.log(`[ServerTimer] Update result:`, updateData)
 
+    // Reset expire tracking for new timer
+    hasCalledOnExpire.current = false
+
     // Trigger re-fetch to start countdown
     setTimerVersion(v => v + 1)
   }
@@ -165,7 +169,10 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       const remaining = calculateRemaining()
       setTimeRemaining(Math.max(0, remaining))
 
-      if (remaining <= 0 && !isExpired) {
+      // Call onExpire only once when timer hits 0
+      if (remaining <= 0 && !hasCalledOnExpire.current) {
+        console.log(`[ServerTimer] Timer expired for ${timerType}, calling onExpire`)
+        hasCalledOnExpire.current = true
         setIsExpired(true)
         onExpireRef.current?.()
       }
@@ -199,16 +206,14 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
           isExpired: remaining <= 0,
         })
 
-        // Only start interval if timer hasn't expired
-        if (remaining > 0) {
-          updateTimer()
-          // Update every second
-          intervalId = setInterval(updateTimer, 1000)
-        } else {
-          console.warn(`[ServerTimer] Loaded timer is already expired, showing 0`)
-          setTimeRemaining(0)
-          setIsExpired(true)
-        }
+        // Reset expire tracking when loading a new timer
+        hasCalledOnExpire.current = false
+
+        // Always start the interval - it will handle expired state
+        updateTimer()
+
+        // Update every second
+        intervalId = setInterval(updateTimer, 1000)
       } else {
         console.log(`[ServerTimer] No active ${timerType} timer found`)
       }
@@ -239,6 +244,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
             })
             startTimeCache = newStartTime
             durationCache = newDuration
+            hasCalledOnExpire.current = false // Reset for new timer
             setIsExpired(false)
             updateTimer()
           }
@@ -262,7 +268,7 @@ export function useServerTimer(options: UseServerTimerOptions): UseServerTimerRe
       subscription.unsubscribe()
       document.removeEventListener("visibilitychange", handleVisibilityChange)
     }
-  }, [enabled, gameId, timerType, isExpired, timerVersion]) // Added timerVersion to trigger re-fetch
+  }, [enabled, gameId, timerType, timerVersion]) // Removed isExpired to prevent re-run on expiry
 
   return {
     timeRemaining,

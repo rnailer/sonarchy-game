@@ -16,7 +16,8 @@ export default function CategorySelected() {
   const gameCode = searchParams.get("code")
   const [countdown, setCountdown] = useState(3)
   const [isMuted, setIsMuted] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // TODO: Add host-only sounds later
+  // const audioRef = useRef<HTMLAudioElement | null>(null)
   const [debugInfo, setDebugInfo] = useState<string[]>([])
 
   const addDebug = (msg: string) => {
@@ -95,28 +96,30 @@ export default function CategorySelected() {
     updateCategory()
   }, [gameCode, selectedCategory])
 
-  useEffect(() => {
-    const audioTimeout = setTimeout(() => {
-      audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-bit%20Countdown%20D-q2pOCsVe8lEbv9dXtvx4WMLm1hyxOx.wav")
-      audioRef.current.loop = false
-      audioRef.current.volume = isMuted ? 0 : 1
-      audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
-    }, 1000)
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   const audioTimeout = setTimeout(() => {
+  //     audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/8-bit%20Countdown%20D-q2pOCsVe8lEbv9dXtvx4WMLm1hyxOx.wav")
+  //     audioRef.current.loop = false
+  //     audioRef.current.volume = isMuted ? 0 : 1
+  //     audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
+  //   }, 1000)
 
-    return () => {
-      clearTimeout(audioTimeout)
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
+  //   return () => {
+  //     clearTimeout(audioTimeout)
+  //     if (audioRef.current) {
+  //       audioRef.current.pause()
+  //       audioRef.current = null
+  //     }
+  //   }
+  // }, [])
 
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : 1
-    }
-  }, [isMuted])
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   if (audioRef.current) {
+  //     audioRef.current.volume = isMuted ? 0 : 1
+  //   }
+  // }, [isMuted])
 
   useEffect(() => {
     if (countdown > 0) {

@@ -43,7 +43,6 @@ export default function PickYourSong() {
   const [category, setCategory] = useState<string>("Songs about cars or driving")
   const timerStartedRef = useRef(false)
   const hasHandledExpiration = useRef(false)
-  const [countdown, setCountdown] = useState<number | "GO" | null>(3)
 
   // Phase sync for song selection
   const { currentPhase, isLoading, isCorrectPhase } = usePhaseSync({
@@ -80,7 +79,8 @@ export default function PickYourSong() {
 
   const [searchInput, setSearchInput] = useState("")
   const [isMuted, setIsMuted] = useState(false)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
+  // TODO: Add host-only sounds later
+  // const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const [searchResults, setSearchResults] = useState<SpotifyTrack[]>([])
   const [isSearching, setIsSearching] = useState(false)
@@ -103,49 +103,27 @@ export default function PickYourSong() {
     console.log("[v0] Pick Your Song Page - Successfully loaded!")
   }, [])
 
-  useEffect(() => {
-    audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
-    audioRef.current.loop = true
-    audioRef.current.volume = isMuted ? 0 : 0.5
-    audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   audioRef.current = new Audio("https://hebbkx1anhila5yf.public.blob.vercel-storage.com/ClockTick_BW.49759-5tQ73YsHaA1iUYYs96tgX16MIN18cC.wav")
+  //   audioRef.current.loop = true
+  //   audioRef.current.volume = isMuted ? 0 : 0.5
+  //   audioRef.current.play().catch((e) => console.log("[v0] Audio play failed:", e))
 
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause()
-        audioRef.current = null
-      }
-    }
-  }, [])
+  //   return () => {
+  //     if (audioRef.current) {
+  //       audioRef.current.pause()
+  //       audioRef.current = null
+  //     }
+  //   }
+  // }, [])
 
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = isMuted ? 0 : 0.5
-    }
-  }, [isMuted])
-
-  // Countdown animation effect (3-2-1-GO)
-  useEffect(() => {
-    if (countdown === null) return
-
-    if (countdown === "GO") {
-      // Show "GO" for 500ms, then enable search
-      const timer = setTimeout(() => {
-        console.log("[v0] ⏱️ Countdown complete! Song selection enabled")
-        setCountdown(null)
-      }, 500)
-      return () => clearTimeout(timer)
-    } else if (typeof countdown === "number" && countdown > 0) {
-      // Countdown: 3, 2, 1
-      const timer = setTimeout(() => {
-        if (countdown === 1) {
-          setCountdown("GO")
-        } else {
-          setCountdown(countdown - 1)
-        }
-      }, 1000)
-      return () => clearTimeout(timer)
-    }
-  }, [countdown])
+  // TODO: Add host-only sounds later
+  // useEffect(() => {
+  //   if (audioRef.current) {
+  //     audioRef.current.volume = isMuted ? 0 : 0.5
+  //   }
+  // }, [isMuted])
 
   // Fetch gameId and start timer
   useEffect(() => {
@@ -1115,54 +1093,6 @@ export default function PickYourSong() {
         </>
       )}
 
-      {/* Countdown overlay (3-2-1-GO) */}
-      {countdown !== null && (
-        <>
-          <div
-            className="fixed inset-0 z-[200]"
-            style={{
-              background: "rgba(0, 0, 34, 0.95)",
-            }}
-          />
-          <div
-            className="fixed inset-0 z-[201] flex items-center justify-center"
-          >
-            <div
-              className="text-center"
-              style={{
-                animation: countdown === "GO" ? "scaleInBounce 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)" : "pulse 0.8s ease-in-out",
-              }}
-            >
-              <div
-                className="font-black"
-                style={{
-                  fontSize: countdown === "GO" ? "8rem" : "12rem",
-                  background: countdown === "GO"
-                    ? "linear-gradient(to right, #00FF88, #00D4AA)"
-                    : "linear-gradient(to right, #8BE1FF, #0D91EA)",
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  textShadow: "0 8px 16px rgba(0, 0, 0, 0.5)",
-                  lineHeight: 1,
-                }}
-              >
-                {countdown === "GO" ? "GO!" : countdown}
-              </div>
-            </div>
-          </div>
-          <style jsx>{`
-            @keyframes pulse {
-              0%, 100% { transform: scale(1); opacity: 1; }
-              50% { transform: scale(1.1); opacity: 0.8; }
-            }
-            @keyframes scaleInBounce {
-              0% { transform: scale(0.3); opacity: 0; }
-              50% { transform: scale(1.15); }
-              100% { transform: scale(1); opacity: 1; }
-            }
-          `}</style>
-        </>
-      )}
     </div>
   )
 }
