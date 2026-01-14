@@ -947,9 +947,9 @@ export default function PlaytimePlayback() {
 
       addDebugLog(`🎵 Song: ${songDurationSeconds}s total, ${actualElapsedTime}s elapsed, ${remainingTime}s remaining`)
 
-      // If song has reached its natural end, show overlay and wait for phase sync
+      // If song has reached its natural end, show overlay and transition to ranking
       if (hasReachedEnd) {
-        addDebugLog(`🎉 Song has reached its natural end! Waiting for phase transition...`)
+        addDebugLog(`🎉 Song has reached its natural end!`)
         if (audioRef.current) {
           audioRef.current.pause()
         }
@@ -992,8 +992,29 @@ export default function PlaytimePlayback() {
         setShowOverlay(true)
         setVoteResult("extend")
 
-        // Phase sync will redirect all players to leaderboard when phase changes to 'ranking'
-        // No manual navigation needed
+        // CRITICAL: Host must transition to ranking phase when song ends naturally
+        if (isHost && gameId) {
+          ;(async () => {
+            const supabase = createClient()
+            const { data: game } = await supabase
+              .from("games")
+              .select("current_phase")
+              .eq("id", gameId)
+              .single()
+
+            if (game?.current_phase === 'ranking') {
+              addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
+              return
+            }
+
+            addDebugLog("🎯 Host setting phase to ranking (song ended naturally)")
+            await setGamePhase(gameId, 'ranking')
+            addDebugLog("✅ Phase set to ranking - all players will be redirected")
+          })()
+        } else {
+          addDebugLog("⏳ Non-host waiting for phase change to ranking")
+        }
+
         return
       }
 
@@ -1010,6 +1031,33 @@ export default function PlaytimePlayback() {
 
         // Restart server timer with new duration
         startServerTimer(nextRoundDuration)
+
+        // CRITICAL: Clear ALL votes from database after extend
+        if (gameId) {
+          const supabase = createClient()
+          supabase
+            .from("games")
+            .select("current_round")
+            .eq("id", gameId)
+            .single()
+            .then(({ data: game }) => {
+              if (game) {
+                supabase
+                  .from("player_votes")
+                  .delete()
+                  .eq("game_id", gameId)
+                  .eq("round_number", game.current_round)
+                  .then(({ error }) => {
+                    if (error) {
+                      console.error("[v0] ❌ Error clearing votes after extend:", error)
+                    } else {
+                      console.log("[v0] ✅ Votes cleared from database after extend")
+                      addDebugLog("✅ Votes cleared from database after extend")
+                    }
+                  })
+              }
+            })
+        }
 
         setTimeout(() => {
           setShowOverlay(false)
@@ -1034,6 +1082,9 @@ export default function PlaytimePlayback() {
           pauseSpotifyPlayback(spotifyAccessToken)
         }
 
+        // CRITICAL: Mark song as ended to stop local timer
+        setSongEnded(true)
+
         // Only host sets phase to ranking when skip wins
         if (isHost && gameId) {
           // Check phase and set to ranking in async IIFE (useEffect can't be async)
@@ -1055,6 +1106,8 @@ export default function PlaytimePlayback() {
             await setGamePhase(gameId, 'ranking')
             addDebugLog("✅ Phase set to ranking - all players will be redirected")
           })()
+        } else {
+          addDebugLog("⏳ Non-host waiting for phase change to ranking (skipped)")
         }
 
         // Phase sync will redirect all players to leaderboard
