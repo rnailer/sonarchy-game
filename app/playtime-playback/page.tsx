@@ -959,6 +959,35 @@ export default function PlaytimePlayback() {
           pauseSpotifyPlayback(spotifyAccessToken)
         }
 
+        // Award bonus points to song owner for song completion
+        if (playerData && gameId) {
+          console.log("[v0] 🎁 Awarding +10 bonus points for song completion")
+          addDebugLog(`🎁 Awarding +10 bonus points to ${playerData.player_name}`)
+
+          const supabase = createClient()
+          supabase
+            .from("game_players")
+            .select("bonus_points")
+            .eq("id", playerData.id)
+            .single()
+            .then(({ data: playerInfo }) => {
+              const currentBonus = playerInfo?.bonus_points || 0
+              const newBonus = currentBonus + 10
+
+              supabase
+                .from("game_players")
+                .update({ bonus_points: newBonus })
+                .eq("id", playerData.id)
+                .then(({ error }) => {
+                  if (error) {
+                    console.error("[v0] ❌ Error awarding bonus points:", error)
+                  } else {
+                    console.log("[v0] ✅ Bonus points awarded successfully:", newBonus)
+                  }
+                })
+            })
+        }
+
         setSongEnded(true)
         setShowOverlay(true)
         setVoteResult("extend")

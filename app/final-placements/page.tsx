@@ -47,6 +47,7 @@ function FinalPlacementsContent() {
   const [currentRound, setCurrentRound] = useState(1)
   const [players, setPlayers] = useState<Player[]>([])
   const [spectators, setSpectators] = useState<Player[]>([])
+  const [allPlayersForColors, setAllPlayersForColors] = useState<Player[]>([]) // Maintains joined_at order for consistent colors
   const [expandedPlayers, setExpandedPlayers] = useState<Set<string>>(new Set())
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null)
   const [gameId, setGameId] = useState<string | null>(null)
@@ -160,6 +161,9 @@ function FinalPlacementsContent() {
           placement: placementsMap[p.id] || index + 1,
         }
       })
+
+      // Store all players in joined_at order for consistent color indexing
+      setAllPlayersForColors(playerData)
 
       // Split into players with songs (Top Players) and without songs (Spectators)
       const playersWithSongs = playerData.filter(p => p.songs.length > 0)
@@ -523,7 +527,9 @@ function FinalPlacementsContent() {
   }
 
   const getPlayerColorIndex = (playerId: string) => {
-    return players.findIndex((p) => p.id === playerId)
+    // Use allPlayersForColors which maintains joined_at order for consistent colors
+    const index = allPlayersForColors.findIndex((p) => p.id === playerId)
+    return index >= 0 ? index : 0
   }
 
   // Show loading state immediately when navigating

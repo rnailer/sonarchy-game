@@ -202,7 +202,6 @@ export default function SelectCategory() {
   })
 
   useEffect(() => {
-    setPresetCategories(getRandomCategories(10))
     addDebug(`✅ Page loaded: category-selected`)
     addDebug(`🎮 Game Code: ${gameCode}`)
 
@@ -214,7 +213,7 @@ export default function SelectCategory() {
 
       const { data: game } = await supabase
         .from("games")
-        .select("id, current_round, current_category, next_category_picker_id")
+        .select("id, current_round, current_category, next_category_picker_id, used_categories")
         .eq("game_code", gameCode)
         .single()
 
@@ -222,6 +221,20 @@ export default function SelectCategory() {
         setGameId(game.id) // Set gameId for server timer
         setCurrentRound(game.current_round || 1)
         addDebug(`📋 Round: ${game.current_round}`)
+
+        // Filter out used categories from preset list
+        const usedCategories = (game.used_categories as string[]) || []
+        console.log("[v0] 🎯 Used categories:", usedCategories)
+        const availableCategories = ALL_PRESET_CATEGORIES.filter(
+          cat => !usedCategories.includes(cat.text)
+        )
+        console.log("[v0] 🎲 Available categories:", availableCategories.length, "out of", ALL_PRESET_CATEGORIES.length)
+
+        // Randomly select 10 from available categories
+        const shuffled = [...availableCategories].sort(() => Math.random() - 0.5)
+        const selected = shuffled.slice(0, Math.min(10, availableCategories.length))
+        setPresetCategories(selected)
+        addDebug(`🎲 Loaded ${selected.length} available categories`)
 
         // Check if this player is the category picker
         const isThisPlayerPicker = game.next_category_picker_id === myPlayerId
@@ -389,16 +402,27 @@ export default function SelectCategory() {
 
   // Chat subscription
   useEffect(() => {
-    if (!gameId) return
+    if (!gameId) {
+      console.log("[v0] ❌ Chat: No gameId, skipping subscription")
+      return
+    }
+
+    console.log("[v0] 📨 Setting up chat for game:", gameId)
 
     const fetchMessages = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("game_chat")
         .select("*")
         .eq("game_id", gameId)
         .order("created_at", { ascending: true })
 
+      if (error) {
+        console.error("[v0] ❌ Error loading chat messages:", error)
+        return
+      }
+
       if (data) {
+        console.log("[v0] ✅ Loaded", data.length, "chat messages")
         const formattedMessages = data.map((msg: any) => ({
           id: msg.id,
           player_id: msg.player_id || "",
@@ -408,6 +432,9 @@ export default function SelectCategory() {
           created_at: msg.created_at
         }))
         setChatMessages(formattedMessages)
+      } else {
+        console.log("[v0] ℹ️ No chat messages found")
+        setChatMessages([])
       }
     }
 
@@ -424,6 +451,7 @@ export default function SelectCategory() {
           filter: `game_id=eq.${gameId}`
         },
         (payload) => {
+          console.log("[v0] 📨 New chat message received:", payload.new)
           const newMessage = {
             id: payload.new.id as string,
             player_id: (payload.new.player_id as string) || "",
@@ -437,7 +465,10 @@ export default function SelectCategory() {
       )
       .subscribe()
 
+    console.log("[v0] ✅ Chat subscription active")
+
     return () => {
+      console.log("[v0] 🧹 Cleaning up chat subscription")
       supabase.removeChannel(channel)
     }
   }, [gameId, supabase])
@@ -456,20 +487,31 @@ export default function SelectCategory() {
   const progressPercentage = (timeRemaining / 60) * 100
 
   const sendChatMessage = async () => {
-    if (!newMessage.trim() || !gameId || !gameCode) return
+    if (!newMessage.trim() || !gameId || !gameCode) {
+      console.log("[v0] ❌ Cannot send chat message:", { newMessage: !!newMessage.trim(), gameId, gameCode })
+      return
+    }
 
     const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
     const playerNameFromStorage = localStorage.getItem(`player_name_${gameCode}`) || playerName
     const playerAvatarFromStorage = localStorage.getItem(`player_avatar_${gameCode}`) || ""
 
-    await supabase.from("game_chat").insert({
+    console.log("[v0] 📤 Sending chat message:", { gameId, playerId: myPlayerId, playerName: playerNameFromStorage, message: newMessage.trim() })
+
+    const { data, error } = await supabase.from("game_chat").insert({
       game_id: gameId,
       player_id: myPlayerId,
       player_name: playerNameFromStorage,
       player_avatar: playerAvatarFromStorage,
       message: newMessage.trim()
-    })
+    }).select()
 
+    if (error) {
+      console.error("[v0] ❌ Chat insert error:", error)
+      return
+    }
+
+    console.log("[v0] ✅ Chat message sent successfully:", data)
     setNewMessage("")
   }
 
@@ -485,7 +527,7 @@ export default function SelectCategory() {
       addDebug(`🔒 Locking in: ${category}`)
 
       if (supabase && gameCode) {
-        const { data: game } = await supabase.from("games").select("id").eq("game_code", gameCode).single()
+        const { data: game } = await supabase.from("games").select("id, used_categories").eq("game_code", gameCode).single()
 
         if (game) {
           // TODO: Add host-only sounds later
@@ -495,9 +537,18 @@ export default function SelectCategory() {
           //   audioRef.current = null
           // }
 
+          // Add category to used_categories array to prevent duplicates in future rounds
+          const usedCategories = (game.used_categories as string[]) || []
+          const updatedUsedCategories = [...usedCategories, category]
+          console.log("[v0] 📝 Adding category to used list:", category)
+          console.log("[v0] 📝 Updated used_categories:", updatedUsedCategories)
+
           // Update category in database (this triggers subscription for all players)
-          await supabase.from("games").update({ current_category: category }).eq("id", game.id)
-          addDebug("✅ Updated game category")
+          await supabase.from("games").update({
+            current_category: category,
+            used_categories: updatedUsedCategories
+          }).eq("id", game.id)
+          addDebug("✅ Updated game category and used categories list")
 
           const myPlayerId = localStorage.getItem(`player_id_${gameCode}`)
           if (myPlayerId) {
