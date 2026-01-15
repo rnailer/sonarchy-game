@@ -227,6 +227,9 @@ function FinalPlacementsContent() {
     }
     hasNavigated.current = true
 
+    // CRITICAL: Show loading state immediately to prevent flicker during phase transition
+    setIsNavigating(true)
+
     console.log("[v0] 🏆 Final placements submitted for round", currentRound)
 
     const supabase = createClient()

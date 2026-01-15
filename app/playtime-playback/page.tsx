@@ -84,43 +84,17 @@ export default function PlaytimePlayback() {
   // Phase is set by: pick-your-song (when all songs picked) or leaderboard (when next song starts)
 
   // Use server-synchronized timer for voting periods
+  // NOTE: onExpire should NOT transition to ranking - vote processing handles that
+  // The local timer effect processes votes and decides whether to extend or skip
   const { timeRemaining: serverTimeRemaining, startTimer: startServerTimer } = useServerTimer({
     gameId: gameId || undefined,
     timerType: "song",
     enabled: !!gameId && hasStartedPlayback,
     onExpire: async () => {
-      addDebugLog("⏱️ Server timer expired - song playback finished")
-
-      // CRITICAL: Only transition to ranking if playback has actually started
-      // This prevents premature phase transitions on page load
-      if (!hasStartedPlaybackRef.current) {
-        addDebugLog("⚠️ Timer expired but playback hasn't started - ignoring")
-        return
-      }
-
-      // Only the host transitions the phase to ranking
-      // This ensures single source of truth and all players sync via phase system
-      if (isHost && gameId) {
-        // Check current phase before setting - avoid duplicate transitions
-        const supabase = createClient()
-        const { data: game } = await supabase
-          .from("games")
-          .select("current_phase")
-          .eq("id", gameId)
-          .single()
-
-        if (game?.current_phase === 'ranking') {
-          addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
-          return
-        }
-
-        // Only set to ranking if not already there
-        addDebugLog("🎯 Host setting phase to ranking")
-        await setGamePhase(gameId, 'ranking')
-        addDebugLog("✅ Phase set to ranking - all players will be redirected by phase sync")
-      } else {
-        addDebugLog("⏳ Non-host waiting for phase change to ranking")
-      }
+      addDebugLog("⏱️ Server timer expired - vote processing will handle phase transition")
+      // DO NOT transition to ranking here!
+      // The local timer useEffect handles vote processing and phase transitions
+      // This prevents race conditions where onExpire fires before extend vote is processed
     },
   })
 
@@ -1085,30 +1059,34 @@ export default function PlaytimePlayback() {
         // CRITICAL: Mark song as ended to stop local timer
         setSongEnded(true)
 
-        // Only host sets phase to ranking when skip wins
-        if (isHost && gameId) {
-          // Check phase and set to ranking in async IIFE (useEffect can't be async)
-          ;(async () => {
-            const supabase = createClient()
-            const { data: game } = await supabase
-              .from("games")
-              .select("current_phase")
-              .eq("id", gameId)
-              .single()
+        // Show skip overlay for 2 seconds before transitioning
+        addDebugLog("📺 Showing skip overlay for 2 seconds...")
 
-            if (game?.current_phase === 'ranking') {
-              addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
-              return
-            }
+        // Delay ranking transition to show overlay
+        setTimeout(() => {
+          // Only host sets phase to ranking when skip wins
+          if (isHost && gameId) {
+            ;(async () => {
+              const supabase = createClient()
+              const { data: game } = await supabase
+                .from("games")
+                .select("current_phase")
+                .eq("id", gameId)
+                .single()
 
-            // Only set to ranking if not already there
-            addDebugLog("🎯 Host setting phase to ranking (skipped)")
-            await setGamePhase(gameId, 'ranking')
-            addDebugLog("✅ Phase set to ranking - all players will be redirected")
-          })()
-        } else {
-          addDebugLog("⏳ Non-host waiting for phase change to ranking (skipped)")
-        }
+              if (game?.current_phase === 'ranking') {
+                addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
+                return
+              }
+
+              addDebugLog("🎯 Host setting phase to ranking (skipped)")
+              await setGamePhase(gameId, 'ranking')
+              addDebugLog("✅ Phase set to ranking - all players will be redirected")
+            })()
+          } else {
+            addDebugLog("⏳ Non-host waiting for phase change to ranking (skipped)")
+          }
+        }, 2000) // 2 second delay for overlay visibility
 
         // Phase sync will redirect all players to leaderboard
         return
