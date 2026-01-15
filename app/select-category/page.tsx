@@ -487,8 +487,21 @@ export default function SelectCategory() {
   const progressPercentage = (timeRemaining / 60) * 100
 
   const sendChatMessage = async () => {
-    if (!newMessage.trim() || !gameId || !gameCode) {
-      console.log("[v0] ❌ Cannot send chat message:", { newMessage: !!newMessage.trim(), gameId, gameCode })
+    console.log("[v0] 📤 === SEND CHAT MESSAGE CALLED ===")
+    console.log("[v0] 📤 newMessage:", newMessage)
+    console.log("[v0] 📤 gameId:", gameId)
+    console.log("[v0] 📤 gameCode:", gameCode)
+
+    if (!newMessage.trim()) {
+      console.log("[v0] ❌ Empty message - returning")
+      return
+    }
+    if (!gameId) {
+      console.log("[v0] ❌ No gameId - returning")
+      return
+    }
+    if (!gameCode) {
+      console.log("[v0] ❌ No gameCode - returning")
       return
     }
 
@@ -496,7 +509,8 @@ export default function SelectCategory() {
     const playerNameFromStorage = localStorage.getItem(`player_name_${gameCode}`) || playerName
     const playerAvatarFromStorage = localStorage.getItem(`player_avatar_${gameCode}`) || ""
 
-    console.log("[v0] 📤 Sending chat message:", { gameId, playerId: myPlayerId, playerName: playerNameFromStorage, message: newMessage.trim() })
+    console.log("[v0] 📤 Player info:", { myPlayerId, playerNameFromStorage, playerAvatarFromStorage })
+    console.log("[v0] 📤 Inserting into game_chat...")
 
     const { data, error } = await supabase.from("game_chat").insert({
       game_id: gameId,
@@ -508,6 +522,7 @@ export default function SelectCategory() {
 
     if (error) {
       console.error("[v0] ❌ Chat insert error:", error)
+      console.error("[v0] ❌ Error details:", JSON.stringify(error, null, 2))
       return
     }
 
@@ -769,17 +784,16 @@ export default function SelectCategory() {
           </div>
         </div>
 
-        {/* Chat button */}
+        {/* Chat button - matches playback page styling */}
         <div className="px-6 pb-8 pt-4">
           <button
             onClick={() => setShowChat(true)}
-            className="w-full py-4 rounded-full text-white font-semibold"
+            className="w-full h-[3rem] text-[1rem] font-semibold rounded-[0.75rem] flex items-center justify-center gap-2 bg-transparent text-white hover:bg-white/5 transition-colors"
             style={{
-              background: "rgba(255, 255, 255, 0.1)",
-              border: "1px solid rgba(255, 255, 255, 0.2)",
+              border: "1px solid #C7D2FF",
             }}
           >
-            Tired of waiting? Lets chat 💬
+            Yay or Nay? Lets discuss 💬
           </button>
         </div>
 
