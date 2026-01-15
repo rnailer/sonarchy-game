@@ -100,6 +100,15 @@ function FinalPlacementsContent() {
     return () => clearTimeout(timer)
   }, [])
 
+  // CRITICAL: Guard against phase changes - show loading immediately when phase changes away
+  useEffect(() => {
+    if (currentPhase && currentPhase !== 'final_placements' && !hasNavigated.current) {
+      console.log("[v0] 🔄 Phase changed away from final_placements, showing loading")
+      hasNavigated.current = true
+      setIsNavigating(true)
+    }
+  }, [currentPhase])
+
   useEffect(() => {
     const loadPlayers = async () => {
       if (!gameCode) return
@@ -535,8 +544,8 @@ function FinalPlacementsContent() {
     return index >= 0 ? index : 0
   }
 
-  // Show loading state immediately when navigating
-  if (isNavigating) {
+  // Show loading state immediately when navigating (use both state and ref for robustness)
+  if (isNavigating || hasNavigated.current) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
         <div className="text-center">

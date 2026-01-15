@@ -129,6 +129,7 @@ export default function PlaytimePlayback() {
   const [voteResult, setVoteResult] = useState<"skip" | "extend" | null>(null)
   const [extensionCount, setExtensionCount] = useState(0)
   const [songEnded, setSongEnded] = useState(false)
+  const [hasReachedNaturalEnd, setHasReachedNaturalEnd] = useState(false) // Distinguishes natural end (bonus) from skip
   const [isProcessingExpiration, setIsProcessingExpiration] = useState(false)
   const [isAnimatingIn, setIsAnimatingIn] = useState(true)
   const [totalElapsedTime, setTotalElapsedTime] = useState(0)
@@ -385,6 +386,7 @@ export default function PlaytimePlayback() {
       console.log("[v0] 🎵 Audio ended naturally")
       addDebugLog("🎵 Audio playback ended")
       setSongEnded(true)
+      setHasReachedNaturalEnd(true) // Natural end - show bonus overlay
     })
 
     audioRef.current.addEventListener("error", (e) => {
@@ -919,6 +921,14 @@ export default function PlaytimePlayback() {
       const remainingTime = songDurationSeconds - actualElapsedTime
       const hasReachedEnd = remainingTime <= 0
 
+      // Enhanced logging for song end detection debugging
+      console.log("[v0] 🎵 === SONG DURATION CHECK ===")
+      console.log("[v0] 🎵 playerData?.song_duration_ms:", playerData?.song_duration_ms)
+      console.log("[v0] 🎵 songDurationSeconds:", songDurationSeconds)
+      console.log("[v0] 🎵 totalElapsedTime:", totalElapsedTime)
+      console.log("[v0] 🎵 actualElapsedTime:", actualElapsedTime)
+      console.log("[v0] 🎵 remainingTime:", remainingTime)
+      console.log("[v0] 🎵 hasReachedEnd:", hasReachedEnd)
       addDebugLog(`🎵 Song: ${songDurationSeconds}s total, ${actualElapsedTime}s elapsed, ${remainingTime}s remaining`)
 
       // If song has reached its natural end, show overlay and transition to ranking
@@ -963,6 +973,7 @@ export default function PlaytimePlayback() {
         }
 
         setSongEnded(true)
+        setHasReachedNaturalEnd(true) // Natural end - show bonus overlay
         setShowOverlay(true)
         setVoteResult("extend")
 
@@ -994,6 +1005,12 @@ export default function PlaytimePlayback() {
 
       // Song hasn't ended, check votes
       const result = extendVotes > skipVotes ? "extend" : "skip"
+      console.log("[v0] 🗳️ === VOTE RESULT ===")
+      console.log("[v0] 🗳️ skipVotes:", skipVotes)
+      console.log("[v0] 🗳️ extendVotes:", extendVotes)
+      console.log("[v0] 🗳️ result:", result)
+      console.log("[v0] 🗳️ Setting voteResult to:", result)
+      console.log("[v0] 🗳️ Setting showOverlay to: true")
       addDebugLog(`🎯 Vote result: ${result}`)
       setVoteResult(result)
       setShowOverlay(true)
@@ -1852,7 +1869,7 @@ export default function PlaytimePlayback() {
               animation: "stampIn 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards",
             }}
           >
-            {songEnded ? (
+            {hasReachedNaturalEnd ? (
               <div className="text-center">
                 <div
                   className="text-[4rem] font-black mb-4"
