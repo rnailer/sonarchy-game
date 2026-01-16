@@ -81,11 +81,12 @@ function FinalPlacementsContent() {
   // Track loading states to prevent flicker
   const [timerLoaded, setTimerLoaded] = useState(false)
   const [playersLoaded, setPlayersLoaded] = useState(false)
-  const [isNavigating, setIsNavigating] = useState(false) // NEW: Immediate loading state
+  const [isNavigating, setIsNavigating] = useState(false) // Immediate loading state for navigation
   const [minLoadComplete, setMinLoadComplete] = useState(false) // Minimum load time to prevent flash
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false) // Initial render delay
 
   // Master loading state - only show content when everything is ready
-  const isFullyLoaded = playersLoaded && timerLoaded && minLoadComplete
+  const isFullyLoaded = playersLoaded && timerLoaded && minLoadComplete && initialLoadComplete
 
   // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
   useEffect(() => {
@@ -97,6 +98,12 @@ function FinalPlacementsContent() {
   // Minimum load time to prevent flash on double-navigation
   useEffect(() => {
     const timer = setTimeout(() => setMinLoadComplete(true), 500)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Initial load delay - blocks ALL rendering until complete
+  useEffect(() => {
+    const timer = setTimeout(() => setInitialLoadComplete(true), 300)
     return () => clearTimeout(timer)
   }, [])
 

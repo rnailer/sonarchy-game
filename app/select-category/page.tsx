@@ -512,11 +512,11 @@ export default function SelectCategory() {
     console.log("[v0] 📤 Player info:", { myPlayerId, playerNameFromStorage, playerAvatarFromStorage })
     console.log("[v0] 📤 Inserting into game_chat...")
 
+    // NOTE: player_avatar column doesn't exist in game_chat table - don't include it
     const { data, error } = await supabase.from("game_chat").insert({
       game_id: gameId,
       player_id: myPlayerId,
       player_name: playerNameFromStorage,
-      player_avatar: playerAvatarFromStorage,
       message: newMessage.trim()
     }).select()
 

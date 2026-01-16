@@ -131,6 +131,7 @@ export default function PlaytimePlayback() {
   const [songEnded, setSongEnded] = useState(false)
   const [hasReachedNaturalEnd, setHasReachedNaturalEnd] = useState(false) // Distinguishes natural end (bonus) from skip
   const [isProcessingExpiration, setIsProcessingExpiration] = useState(false)
+  const [songPlaybackStartTime, setSongPlaybackStartTime] = useState<number | null>(null) // Track actual playback start for natural end detection
   const [isAnimatingIn, setIsAnimatingIn] = useState(true)
   const [totalElapsedTime, setTotalElapsedTime] = useState(0)
   const [spotifyAccessToken, setSpotifyAccessToken] = useState<string | null>(null)
@@ -711,6 +712,7 @@ export default function PlaytimePlayback() {
     setNeedsUserInteraction(false)
     setHasStartedPlayback(true)
     hasStartedPlaybackRef.current = true
+    setSongPlaybackStartTime(Date.now()) // Track when playback actually started
     setIsAnimatingIn(false)
 
     // If user is host and Spotify is ready, start Spotify playback
@@ -873,6 +875,7 @@ export default function PlaytimePlayback() {
     addDebugLog("⏱️ Starting playback timer...")
     setHasStartedPlayback(true)
     hasStartedPlaybackRef.current = true
+    setSongPlaybackStartTime(Date.now()) // Track when playback actually started
     setIsAnimatingIn(false)
 
     console.log("[v0] Player data:", playerData)
@@ -914,22 +917,23 @@ export default function PlaytimePlayback() {
       setIsProcessingExpiration(true)
 
       addDebugLog("⏰ Timer expired. Processing votes...")
-      const actualElapsedTime = totalElapsedTime + 1
-      addDebugLog(`📊 Final vote tally - Skip: ${skipVotes}, Extend: ${extendVotes}`)
 
-      const songDurationSeconds = Math.floor((playerData?.song_duration_ms || 180000) / 1000)
-      const remainingTime = songDurationSeconds - actualElapsedTime
-      const hasReachedEnd = remainingTime <= 0
+      // CRITICAL: Use actual playback time for song end detection (not timer-based elapsed time)
+      const songDurationMs = playerData?.song_duration_ms || 0
+      const actualElapsedMs = songPlaybackStartTime ? Date.now() - songPlaybackStartTime : 0
+      const hasReachedEnd = actualElapsedMs >= songDurationMs && songDurationMs > 0
 
       // Enhanced logging for song end detection debugging
-      console.log("[v0] 🎵 === SONG DURATION CHECK ===")
-      console.log("[v0] 🎵 playerData?.song_duration_ms:", playerData?.song_duration_ms)
-      console.log("[v0] 🎵 songDurationSeconds:", songDurationSeconds)
-      console.log("[v0] 🎵 totalElapsedTime:", totalElapsedTime)
-      console.log("[v0] 🎵 actualElapsedTime:", actualElapsedTime)
-      console.log("[v0] 🎵 remainingTime:", remainingTime)
+      console.log("[v0] 🎵 === SONG DURATION CHECK (REAL TIME) ===")
+      console.log("[v0] 🎵 songPlaybackStartTime:", songPlaybackStartTime)
+      console.log("[v0] 🎵 songDurationMs:", songDurationMs)
+      console.log("[v0] 🎵 actualElapsedMs:", actualElapsedMs)
       console.log("[v0] 🎵 hasReachedEnd:", hasReachedEnd)
-      addDebugLog(`🎵 Song: ${songDurationSeconds}s total, ${actualElapsedTime}s elapsed, ${remainingTime}s remaining`)
+      console.log("[v0] 🎵 remainingMs:", songDurationMs - actualElapsedMs)
+      addDebugLog(`🎵 Song: ${Math.floor(songDurationMs/1000)}s total, ${Math.floor(actualElapsedMs/1000)}s elapsed, ${Math.floor((songDurationMs - actualElapsedMs)/1000)}s remaining`)
+
+      // Calculate remaining time for extend duration (in seconds)
+      const remainingTime = Math.floor((songDurationMs - actualElapsedMs) / 1000)
 
       // If song has reached its natural end, show overlay and transition to ranking
       if (hasReachedEnd) {
@@ -1003,19 +1007,53 @@ export default function PlaytimePlayback() {
         return
       }
 
-      // Song hasn't ended, check votes
-      const result = extendVotes > skipVotes ? "extend" : "skip"
-      console.log("[v0] 🗳️ === VOTE RESULT ===")
-      console.log("[v0] 🗳️ skipVotes:", skipVotes)
-      console.log("[v0] 🗳️ extendVotes:", extendVotes)
-      console.log("[v0] 🗳️ result:", result)
-      console.log("[v0] 🗳️ Setting voteResult to:", result)
-      console.log("[v0] 🗳️ Setting showOverlay to: true")
-      addDebugLog(`🎯 Vote result: ${result}`)
-      setVoteResult(result)
-      setShowOverlay(true)
+      // Song hasn't ended, fetch FRESH votes from database and check result
+      // This ensures all devices see the same vote counts
+      ;(async () => {
+        const supabase = createClient()
 
-      if (result === "extend") {
+        // Get current round
+        const { data: gameData } = await supabase
+          .from("games")
+          .select("current_round")
+          .eq("id", gameId)
+          .single()
+
+        if (!gameData) {
+          console.error("[v0] ❌ Failed to get game data for votes")
+          setIsProcessingExpiration(false)
+          return
+        }
+
+        // Fetch FRESH votes from database
+        const { data: freshVotes, error: votesError } = await supabase
+          .from("player_votes")
+          .select("vote_type")
+          .eq("game_id", gameId)
+          .eq("round_number", gameData.current_round)
+
+        if (votesError) {
+          console.error("[v0] ❌ Failed to fetch votes:", votesError)
+        }
+
+        const freshSkipVotes = freshVotes?.filter(v => v.vote_type === "skip").length || 0
+        const freshExtendVotes = freshVotes?.filter(v => v.vote_type === "extend").length || 0
+
+        console.log("[v0] 🗳️ === VOTE RESULT (FRESH FROM DB) ===")
+        console.log("[v0] 🗳️ freshVotes from DB:", freshVotes)
+        console.log("[v0] 🗳️ freshSkipVotes:", freshSkipVotes)
+        console.log("[v0] 🗳️ freshExtendVotes:", freshExtendVotes)
+        console.log("[v0] 🗳️ Local state - skipVotes:", skipVotes, "extendVotes:", extendVotes)
+
+        const result = freshExtendVotes > freshSkipVotes ? "extend" : "skip"
+        console.log("[v0] 🗳️ result:", result)
+        console.log("[v0] 🗳️ Setting voteResult to:", result)
+        console.log("[v0] 🗳️ Setting showOverlay to: true")
+        addDebugLog(`🎯 Vote result: ${result} (Skip: ${freshSkipVotes}, Extend: ${freshExtendVotes})`)
+        setVoteResult(result)
+        setShowOverlay(true)
+
+        if (result === "extend") {
         // Extend for the next voting period (up to 30 seconds or remaining time)
         const nextRoundDuration = Math.min(30, remainingTime)
         addDebugLog(`⏱️ Extending song for ${nextRoundDuration} more seconds (Extension #${extensionCount + 1})`)
@@ -1108,6 +1146,7 @@ export default function PlaytimePlayback() {
         // Phase sync will redirect all players to leaderboard
         return
       }
+      })() // End of async IIFE for vote processing
       // </CHANGE>
     }
   }, [
@@ -1124,6 +1163,8 @@ export default function PlaytimePlayback() {
     hasStartedPlayback,
     isAnimatingIn,
     gameCode,
+    gameId,
+    songPlaybackStartTime,
   ])
 
 
