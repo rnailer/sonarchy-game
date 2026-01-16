@@ -869,7 +869,12 @@ export default function SelectCategory() {
                   type="text"
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === "Enter" && sendChatMessage()}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && newMessage.trim()) {
+                      console.log("[v0] 📤 Enter key pressed - sending message")
+                      sendChatMessage()
+                    }
+                  }}
                   placeholder="Send a message"
                   className="flex-1 min-w-0 text-white rounded-2xl px-4 py-3 outline-none"
                   style={{
@@ -878,7 +883,10 @@ export default function SelectCategory() {
                   }}
                 />
                 <button
-                  onClick={sendChatMessage}
+                  onClick={() => {
+                    console.log("[v0] 📤 Send button clicked!")
+                    sendChatMessage()
+                  }}
                   className="flex items-center justify-center flex-shrink-0"
                   style={{
                     width: "48px",
