@@ -981,28 +981,35 @@ export default function PlaytimePlayback() {
         setShowOverlay(true)
         setVoteResult("extend")
 
-        // CRITICAL: Host must transition to ranking phase when song ends naturally
-        if (isHost && gameId) {
-          ;(async () => {
-            const supabase = createClient()
-            const { data: game } = await supabase
-              .from("games")
-              .select("current_phase")
-              .eq("id", gameId)
-              .single()
+        addDebugLog("🎉 Showing bonus overlay for 3 seconds...")
 
-            if (game?.current_phase === 'ranking') {
-              addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
-              return
-            }
+        // CRITICAL: Delay phase transition to show bonus overlay
+        // Phase change MUST happen AFTER overlay display time, not immediately
+        setTimeout(() => {
+          setShowOverlay(false)
 
-            addDebugLog("🎯 Host setting phase to ranking (song ended naturally)")
-            await setGamePhase(gameId, 'ranking')
-            addDebugLog("✅ Phase set to ranking - all players will be redirected")
-          })()
-        } else {
-          addDebugLog("⏳ Non-host waiting for phase change to ranking")
-        }
+          if (isHost && gameId) {
+            ;(async () => {
+              const supabase = createClient()
+              const { data: game } = await supabase
+                .from("games")
+                .select("current_phase")
+                .eq("id", gameId)
+                .single()
+
+              if (game?.current_phase === 'ranking') {
+                addDebugLog("⚠️ Phase already ranking, skipping duplicate transition")
+                return
+              }
+
+              addDebugLog("🎯 Host setting phase to ranking (song ended naturally)")
+              await setGamePhase(gameId, 'ranking')
+              addDebugLog("✅ Phase set to ranking - all players will be redirected")
+            })()
+          } else {
+            addDebugLog("⏳ Non-host waiting for phase change to ranking")
+          }
+        }, 3000) // 3 second delay for bonus overlay
 
         return
       }
@@ -1057,38 +1064,11 @@ export default function PlaytimePlayback() {
         // Extend for the next voting period (up to 30 seconds or remaining time)
         const nextRoundDuration = Math.min(30, remainingTime)
         addDebugLog(`⏱️ Extending song for ${nextRoundDuration} more seconds (Extension #${extensionCount + 1})`)
+        addDebugLog("📺 Showing extend overlay for 2 seconds...")
 
-        // Restart server timer with new duration
-        startServerTimer(nextRoundDuration)
-
-        // CRITICAL: Clear ALL votes from database after extend
-        if (gameId) {
-          const supabase = createClient()
-          supabase
-            .from("games")
-            .select("current_round")
-            .eq("id", gameId)
-            .single()
-            .then(({ data: game }) => {
-              if (game) {
-                supabase
-                  .from("player_votes")
-                  .delete()
-                  .eq("game_id", gameId)
-                  .eq("round_number", game.current_round)
-                  .then(({ error }) => {
-                    if (error) {
-                      console.error("[v0] ❌ Error clearing votes after extend:", error)
-                    } else {
-                      console.log("[v0] ✅ Votes cleared from database after extend")
-                      addDebugLog("✅ Votes cleared from database after extend")
-                    }
-                  })
-              }
-            })
-        }
-
-        setTimeout(() => {
+        // CRITICAL: All operations happen AFTER overlay display time
+        // This ensures all players see the overlay before state changes
+        setTimeout(async () => {
           setShowOverlay(false)
           setVoteResult(null)
           setTimeRemaining(nextRoundDuration)
@@ -1097,7 +1077,36 @@ export default function PlaytimePlayback() {
           setUserVote(null)
           setExtensionCount(extensionCount + 1)
           setIsProcessingExpiration(false)
-        }, 1500)
+
+          // Only HOST restarts timer and clears votes (after overlay clears)
+          if (isHost && gameId) {
+            // Restart server timer with new duration
+            startServerTimer(nextRoundDuration)
+
+            // Clear ALL votes from database after extend
+            const supabase = createClient()
+            const { data: gameData } = await supabase
+              .from("games")
+              .select("current_round")
+              .eq("id", gameId)
+              .single()
+
+            if (gameData) {
+              const { error } = await supabase
+                .from("player_votes")
+                .delete()
+                .eq("game_id", gameId)
+                .eq("round_number", gameData.current_round)
+
+              if (error) {
+                console.error("[v0] ❌ Error clearing votes after extend:", error)
+              } else {
+                console.log("[v0] ✅ Votes cleared from database after extend")
+                addDebugLog("✅ Votes cleared from database after extend")
+              }
+            }
+          }
+        }, 2000) // 2 second delay for overlay visibility
         return
       } else {
         // Skip - end song early, set phase to ranking
@@ -1119,6 +1128,10 @@ export default function PlaytimePlayback() {
 
         // Delay ranking transition to show overlay
         setTimeout(() => {
+          // Clear overlay after display time
+          setShowOverlay(false)
+          setVoteResult(null)
+
           // Only host sets phase to ranking when skip wins
           if (isHost && gameId) {
             ;(async () => {

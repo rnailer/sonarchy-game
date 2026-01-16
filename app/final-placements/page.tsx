@@ -43,6 +43,9 @@ function FinalPlacementsContent() {
   const songOwnerIdFromUrl = searchParams.get("songOwnerId")
   const [songOwnerId, setSongOwnerId] = useState<string | null>(songOwnerIdFromUrl)
 
+  // CRITICAL: Hydration guard - prevents flicker during initial render
+  const [isHydrated, setIsHydrated] = useState(false)
+
   // CRITICAL: Read currentRound from database, NOT from URL params (can be stale)
   const [currentRound, setCurrentRound] = useState(1)
   const [players, setPlayers] = useState<Player[]>([])
@@ -87,6 +90,11 @@ function FinalPlacementsContent() {
 
   // Master loading state - only show content when everything is ready
   const isFullyLoaded = playersLoaded && timerLoaded && minLoadComplete && initialLoadComplete
+
+  // CRITICAL: Hydration guard - set immediately after first render
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
 
   // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
   useEffect(() => {
@@ -549,6 +557,12 @@ function FinalPlacementsContent() {
     // Use allPlayersForColors which maintains joined_at order for consistent colors
     const index = allPlayersForColors.findIndex((p) => p.id === playerId)
     return index >= 0 ? index : 0
+  }
+
+  // CRITICAL: Hydration guard - return null until React hydration complete
+  // This prevents ANY content flash during initial render
+  if (!isHydrated) {
+    return null
   }
 
   // Show loading state immediately when navigating (use both state and ref for robustness)
