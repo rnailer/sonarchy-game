@@ -410,7 +410,7 @@ export default function SelectCategory() {
     console.log("[v0] 📨 Setting up chat for game:", gameId)
 
     const fetchMessages = async () => {
-      const { data, error } = await supabase
+      const { data: messages, error } = await supabase
         .from("game_chat")
         .select("*")
         .eq("game_id", gameId)
@@ -421,13 +421,34 @@ export default function SelectCategory() {
         return
       }
 
-      if (data) {
-        console.log("[v0] ✅ Loaded", data.length, "chat messages")
-        const formattedMessages = data.map((msg: any) => ({
+      if (messages && messages.length > 0) {
+        console.log("[v0] ✅ Loaded", messages.length, "chat messages")
+
+        // Get unique player names to fetch their avatars
+        const playerNames = [...new Set(messages.map((m: any) => m.player_name))]
+
+        // Fetch avatars from game_players
+        const { data: players } = await supabase
+          .from("game_players")
+          .select("player_name, avatar_id")
+          .eq("game_id", gameId)
+          .in("player_name", playerNames)
+
+        // Create avatar lookup map
+        const avatarMap = new Map<string, string>()
+        players?.forEach((p: any) => {
+          if (p.player_name && p.avatar_id) {
+            avatarMap.set(p.player_name, p.avatar_id)
+          }
+        })
+
+        console.log("[v0] 👥 Fetched avatars for", avatarMap.size, "players")
+
+        const formattedMessages = messages.map((msg: any) => ({
           id: msg.id,
           player_id: msg.player_id || "",
           player_name: msg.player_name,
-          player_avatar: msg.player_avatar || "",
+          player_avatar: avatarMap.get(msg.player_name) || "boombox",
           message: msg.message,
           created_at: msg.created_at
         }))
@@ -450,13 +471,23 @@ export default function SelectCategory() {
           table: 'game_chat',
           filter: `game_id=eq.${gameId}`
         },
-        (payload) => {
+        async (payload) => {
           console.log("[v0] 📨 New chat message received:", payload.new)
+          const playerName = payload.new.player_name as string
+
+          // Fetch avatar for this player
+          const { data: playerData } = await supabase
+            .from("game_players")
+            .select("avatar_id")
+            .eq("game_id", gameId)
+            .eq("player_name", playerName)
+            .maybeSingle()
+
           const newMessage = {
             id: payload.new.id as string,
             player_id: (payload.new.player_id as string) || "",
-            player_name: payload.new.player_name as string,
-            player_avatar: (payload.new.player_avatar as string) || "",
+            player_name: playerName,
+            player_avatar: playerData?.avatar_id || "boombox",
             message: payload.new.message as string,
             created_at: payload.new.created_at as string
           }

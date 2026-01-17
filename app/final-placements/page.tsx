@@ -46,6 +46,12 @@ function FinalPlacementsContent() {
   // CRITICAL: Hydration guard - prevents flicker during initial render
   const [isHydrated, setIsHydrated] = useState(false)
 
+  // CRITICAL: Debounce PhaseSync - ref tracks if we've started loading (persists across re-renders)
+  const hasStartedLoading = useRef(false)
+
+  // CRITICAL: Delay content render by 500ms to let phase settle (PhaseSync can fire 10+ times)
+  const [showContent, setShowContent] = useState(false)
+
   // CRITICAL: Read currentRound from database, NOT from URL params (can be stale)
   const [currentRound, setCurrentRound] = useState(1)
   const [players, setPlayers] = useState<Player[]>([])
@@ -94,6 +100,18 @@ function FinalPlacementsContent() {
   // CRITICAL: Hydration guard - set immediately after first render
   useEffect(() => {
     setIsHydrated(true)
+  }, [])
+
+  // CRITICAL: 500ms delay before showing content to let PhaseSync settle
+  // PhaseSync can fire 10+ times causing flicker - this debounces it
+  useEffect(() => {
+    if (hasStartedLoading.current) return
+    hasStartedLoading.current = true
+
+    const timer = setTimeout(() => {
+      setShowContent(true)
+    }, 500)
+    return () => clearTimeout(timer)
   }, [])
 
   // Mark timer as loaded when it's set to valid value (≤10 for final_placements)
@@ -562,6 +580,16 @@ function FinalPlacementsContent() {
   // CRITICAL: Hydration guard - show loading spinner until React hydration complete
   // This prevents ANY content flash during initial render
   if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500" />
+      </div>
+    )
+  }
+
+  // CRITICAL: Debounce PhaseSync - wait 500ms before showing any content
+  // This prevents flicker when PhaseSync fires multiple times
+  if (!showContent) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500" />

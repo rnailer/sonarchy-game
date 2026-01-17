@@ -904,6 +904,43 @@ export default function PlaytimePlayback() {
     }
   }, [gameId, hasStartedPlayback, startServerTimer])
 
+  // PROACTIVE SONG END DETECTION - Check every 200ms and pause 500ms before song ends
+  // This prevents the ~1s loop issue where song continues while async pause completes
+  useEffect(() => {
+    if (!songPlaybackStartTime || !playerData?.song_duration_ms || songEnded) return
+
+    const checkSongEnd = () => {
+      const elapsedMs = Date.now() - songPlaybackStartTime
+      const durationMs = playerData.song_duration_ms
+      const remainingMs = durationMs - elapsedMs
+
+      // If within 500ms of end (and not already way past), pause immediately
+      if (remainingMs <= 500 && remainingMs > -5000) {
+        console.log("[v0] 🎵 Proactive song end detected - pausing NOW (remaining:", remainingMs, "ms)")
+        addDebugLog(`🎵 Proactive end - ${remainingMs}ms remaining, pausing NOW`)
+
+        // Pause browser audio immediately
+        if (audioRef.current) {
+          audioRef.current.pause()
+        }
+
+        // Pause Spotify immediately (fire and forget)
+        if (spotifyAccessToken) {
+          fetch('https://api.spotify.com/v1/me/player/pause', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+          }).catch(() => {})
+        }
+
+        setSongEnded(true)
+        setHasReachedNaturalEnd(true)
+      }
+    }
+
+    const interval = setInterval(checkSongEnd, 200) // Check every 200ms
+    return () => clearInterval(interval)
+  }, [songPlaybackStartTime, playerData?.song_duration_ms, songEnded, spotifyAccessToken])
+
   useEffect(() => {
     if (!hasStartedPlayback) return
 
