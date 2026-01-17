@@ -559,10 +559,14 @@ function FinalPlacementsContent() {
     return index >= 0 ? index : 0
   }
 
-  // CRITICAL: Hydration guard - return null until React hydration complete
+  // CRITICAL: Hydration guard - show loading spinner until React hydration complete
   // This prevents ANY content flash during initial render
   if (!isHydrated) {
-    return null
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-purple-900 to-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-4 border-purple-500" />
+      </div>
+    )
   }
 
   // Show loading state immediately when navigating (use both state and ref for robustness)

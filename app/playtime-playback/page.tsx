@@ -938,13 +938,20 @@ export default function PlaytimePlayback() {
       // If song has reached its natural end, show overlay and transition to ranking
       if (hasReachedEnd) {
         addDebugLog(`🎉 Song has reached its natural end!`)
+
+        // IMMEDIATELY stop all playback - don't wait for async operations
         if (audioRef.current) {
           audioRef.current.pause()
         }
 
-        // Pause Spotify if host
-        if (isHost && spotifyAccessToken) {
-          pauseSpotifyPlayback(spotifyAccessToken)
+        // IMMEDIATELY pause Spotify via direct API call (fire and forget)
+        // This is faster than going through pauseSpotifyPlayback which has await calls
+        if (spotifyAccessToken) {
+          fetch('https://api.spotify.com/v1/me/player/pause', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+          }).catch(() => {}) // Ignore errors - fire and forget
+          addDebugLog("⏸️ Spotify pause sent immediately (fire and forget)")
         }
 
         // Award bonus points to song owner for song completion
@@ -1111,13 +1118,20 @@ export default function PlaytimePlayback() {
       } else {
         // Skip - end song early, set phase to ranking
         addDebugLog("⏭️ Song skipped by vote")
+
+        // IMMEDIATELY stop all playback - don't wait for async operations
         if (audioRef.current) {
           audioRef.current.pause()
         }
 
-        // Pause Spotify if host
-        if (isHost && spotifyAccessToken) {
-          pauseSpotifyPlayback(spotifyAccessToken)
+        // IMMEDIATELY pause Spotify via direct API call (fire and forget)
+        // This is faster than going through pauseSpotifyPlayback which has await calls
+        if (spotifyAccessToken) {
+          fetch('https://api.spotify.com/v1/me/player/pause', {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+          }).catch(() => {}) // Ignore errors - fire and forget
+          addDebugLog("⏸️ Spotify pause sent immediately (fire and forget)")
         }
 
         // CRITICAL: Mark song as ended to stop local timer
